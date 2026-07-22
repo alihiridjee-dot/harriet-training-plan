@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harriet's Training Plan</title>
+<meta name="description" content="Harriet Meers — Sprint Triathlon · Ipswich Half · Ironman 70.3 training plan.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="wrap">
+      <div class="kicker">Season Plan · 2026 – 2027</div>
+      <h1>Harriet's <b>Training Plan</b></h1>
+      <div class="sub">One build, three races — swim often, ride long, run smart.</div>
+      <div class="goals">
+        <div class="goal"><b>Sprint Triathlon</b><span>26 Sep 2026</span></div>
+        <div class="goal"><b>Ipswich Half — sub-2</b><span>27 Sep 2026</span></div>
+        <div class="goal"><b>Ironman 70.3</b><span>Apr / May 2027</span></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="stats">
+      <div class="stat"><div class="n" id="stat-race">–</div><div class="l" id="stat-race-l">days to next race</div></div>
+      <div class="stat">
+        <div class="n" id="stat-week">0/0</div><div class="l">this week done</div>
+        <div class="progress"><i id="week-bar" style="width:0%"></i></div>
+      </div>
+      <div class="stat"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
+      <div class="stat"><div class="n" id="stat-total">0</div><div class="l">sessions completed</div></div>
+    </section>
+
+    <div class="cal-head">
+      <h2 id="cal-title">Month</h2>
+      <div class="cal-nav">
+        <button class="btn" id="prev">‹ Prev</button>
+        <button class="btn solid" id="todayBtn">Today</button>
+        <button class="btn" id="next">Next ›</button>
+      </div>
+    </div>
+
+    <div class="weekdays">
+      <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
+    </div>
+    <div class="grid" id="grid"></div>
+
+    <div class="legend" id="legend"></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:4px;">Tap any day to see the sessions, open a workout for the full breakdown, and tick things off. Your progress and notes are saved on this device.</p>
+    <button class="reset-link" id="resetBtn">reset all progress</button>
+
+    <p class="foot">fuel · train · recover — you've got this, Harriet ♡</p>
+  </main>
+
+  <!-- drawer -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="Day detail">
+    <div class="drawer-head">
+      <button class="dclose" id="dclose" aria-label="Close">×</button>
+      <div class="dphase" id="d-phase"></div>
+      <h3 id="d-title"></h3>
+      <div class="ddate" id="d-date"></div>
+      <span class="devent" id="d-event" style="display:none"></span>
+    </div>
+    <div class="drawer-body" id="d-body"></div>
+  </aside>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
