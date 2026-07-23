@@ -303,9 +303,54 @@
     };
   }
 
+  // ---------- 80/20 polarized intensity classifier (Seiler model) ----------
+  // Returns 'easy' | 'hard' | 'strength' | 'rest'. Only easy vs hard feed the
+  // polarized ratio; strength & rest are shown separately.
+  function intensityOf(s) {
+    if (!s) return "rest";
+    const t = s.type;
+    if (t === "rest") return "rest";
+    if (t === "strength") return "strength";
+    if (t === "race") return "hard";
+    if (t === "mobility") return "easy";
+    const hay = ((s.title || "") + " " + (s.sub || "")).toLowerCase();
+    if (/z5|z4|z3|threshold|tempo|vo|interval|sweet|reps|sharpen|cruise|hill|surge|brisk|openers|test|css test/.test(hay)) return "hard";
+    return "easy";
+  }
+
+  // ---------- macro training blocks (for the overview tab) ----------
+  const BLOCKS = [
+    { id: "p1", n: 1, name: "Race Sharpen", start: PLAN_START, end: IPSWICH_HALF,
+      points: "Sprint Tri · Ipswich Half", tint: "p1",
+      focus: "Sharpen swim–bike–run for the September double. One quality run midweek, a long ride + brick at the weekend.",
+      key: ["Tue quality run", "Sat long ride + brick", "Sun long run", "2× swim"] },
+    { id: "recovery", n: 2, name: "Reset", start: "2026-09-28", end: "2026-10-11",
+      points: "Recover & absorb", tint: "recovery",
+      focus: "Two deliberately easy weeks. Nothing hard, nothing over 10 km — let a big season soak in.",
+      key: ["Easy movement", "Short swims", "No long runs"] },
+    { id: "base", n: 3, name: "Base", start: "2026-10-12", end: "2026-12-31",
+      points: "70.3 foundation", tint: "base",
+      focus: "Aerobic base + the winter swim project. Mostly Zone 2 — the 80% that earns the hard 20%.",
+      key: ["Zone-2 long ride", "Base long run", "Swim technique", "Strength ×2"] },
+    { id: "build", n: 4, name: "70.3 Build", start: "2027-01-01", end: "2027-04-18",
+      points: "Ironman 70.3", tint: "build",
+      focus: "The weekend race brick becomes the key session — building toward 90 km + a strong run off the bike.",
+      key: ["Race brick", "Tempo run", "CSS swim endurance", "Long run"] },
+    { id: "taper", n: 5, name: "Peak & Taper", start: "2027-04-19", end: RACE_703,
+      points: "Ironman 70.3", tint: "taper",
+      focus: "Volume drops, a little sharpness stays. Rehearse everything, then rest so you arrive fresh, not fried.",
+      key: ["Final big brick", "Openers", "Rest is the work"] }
+  ];
+  function currentBlock(isoStr) {
+    for (let i = 0; i < BLOCKS.length; i++) {
+      if (isoStr >= BLOCKS[i].start && isoStr <= BLOCKS[i].end) return BLOCKS[i].id;
+    }
+    return isoStr > RACE_703 ? "post" : "pre";
+  }
+
   const TP = {
-    PLAN_START, RACE_703, SPRINT_TRI, IPSWICH_HALF, DOLOMITES,
-    getDay, addDays, daysBetween, parse, iso, weekdayMon0,
+    PLAN_START, RACE_703, SPRINT_TRI, IPSWICH_HALF, DOLOMITES, BLOCKS, currentBlock,
+    getDay, addDays, daysBetween, parse, iso, weekdayMon0, intensityOf,
     TYPE_META: {
       run:      { label: "Run",      color: "#BC6A4C" },
       bike:     { label: "Bike",     color: "#43503C" },
