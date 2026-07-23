@@ -2,65 +2,138 @@
 <html lang="en-GB">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Harriet's Training Plan</title>
-<meta name="description" content="Harriet Meers — Sprint Triathlon · Ipswich Half · Ironman 70.3 training plan.">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Harriet · Ironman Journey</title>
+<meta name="description" content="Harriet Meers — Sprint Triathlon · Ipswich Half · Ironman 70.3. Built on the 80/20 polarized model. Made by Ali ♡">
+<meta name="theme-color" content="#1c2836">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;0,9..144,600;1,9..144,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Nunito:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-  <header class="topbar">
-    <div class="wrap">
-      <div class="kicker">Season Plan · 2026 – 2027</div>
-      <h1>Harriet's <b>Training Plan</b></h1>
-      <div class="sub">One build, three races — swim often, ride long, run smart.</div>
-      <div class="goals">
-        <div class="goal"><b>Sprint Triathlon</b><span>26 Sep 2026</span></div>
-        <div class="goal"><b>Ipswich Half — sub-2</b><span>27 Sep 2026</span></div>
-        <div class="goal"><b>Ironman 70.3</b><span>Apr / May 2027</span></div>
-      </div>
+  <!-- ============ SPLASH · IRONMAN M-DOT ============ -->
+  <div class="splash" id="splash" role="img" aria-label="Ironman — Harriet's journey">
+    <div class="splash-inner">
+      <svg class="mdot" viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <circle class="md-head" cx="150" cy="66" r="55"/>
+        <path class="md-body" d="M95,150 L205,150 L205,300 L173,300 L161,226 L150,259 L139,226 L127,300 L95,300 Z"/>
+        <g class="md-reg"><circle cx="223" cy="290" r="9"/><text x="223" y="294" text-anchor="middle">R</text></g>
+      </svg>
+      <div class="splash-word">IRONMAN <span>70.3</span></div>
+      <div class="splash-name">Harriet's journey</div>
+      <div class="splash-sig">for you — from Ali ♡</div>
     </div>
-  </header>
+    <button class="splash-skip" id="splashSkip">enter ›</button>
+  </div>
 
-  <main class="wrap">
-    <section class="stats">
-      <div class="stat"><div class="n" id="stat-race">–</div><div class="l" id="stat-race-l">days to next race</div></div>
-      <div class="stat">
-        <div class="n" id="stat-week">0/0</div><div class="l">this week done</div>
-        <div class="progress"><i id="week-bar" style="width:0%"></i></div>
+  <!-- ============ MAIN APP ============ -->
+  <div class="app" id="app">
+
+    <header class="hero">
+      <div class="hero-wrap">
+        <div class="hero-row">
+          <div>
+            <div class="hero-kicker">Season 2026 – 2027 · one build, three races</div>
+            <h1 class="hero-title">Harriet's Season</h1>
+            <p class="hero-sub">Every session, stacked up, becomes an Ironman. Easy days easy, hard days hard.</p>
+          </div>
+          <div class="hero-mark" aria-hidden="true">
+            <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="150" cy="66" r="55"/>
+              <path d="M95,150 L205,150 L205,300 L173,300 L161,226 L150,259 L139,226 L127,300 L95,300 Z"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="goals">
+          <div class="goal"><b>Sprint Triathlon</b><span class="g-date">26 Sep 2026</span></div>
+          <div class="goal"><b>Ipswich Half · sub-2</b><span class="g-date">27 Sep 2026</span></div>
+          <div class="goal g-key"><b>Ironman 70.3</b><span class="g-date">Apr / May 2027</span></div>
+        </div>
       </div>
-      <div class="stat"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
-      <div class="stat"><div class="n" id="stat-total">0</div><div class="l">sessions completed</div></div>
-    </section>
+    </header>
 
-    <div class="cal-head">
-      <h2 id="cal-title">Month</h2>
-      <div class="cal-nav">
-        <button class="btn" id="prev">‹ Prev</button>
-        <button class="btn solid" id="todayBtn">Today</button>
-        <button class="btn" id="next">Next ›</button>
+    <main class="wrap">
+
+      <!-- segmented tab control -->
+      <div class="segmented" role="tablist">
+        <button class="seg active" data-view="calendar" role="tab">Calendar</button>
+        <button class="seg" data-view="blocks" role="tab">The Blocks</button>
       </div>
-    </div>
 
-    <div class="weekdays">
-      <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
-    </div>
-    <div class="grid" id="grid"></div>
+      <!-- ===== CALENDAR VIEW ===== -->
+      <section id="view-calendar">
 
-    <div class="legend" id="legend"></div>
-    <p style="font-size:12px;color:var(--muted);margin-top:4px;">Tap any day to see the sessions, open a workout for the full breakdown, and tick things off. Your progress and notes are saved on this device.</p>
-    <button class="reset-link" id="resetBtn">reset all progress</button>
+        <div class="coach-note" id="coachNote"></div>
 
-    <p class="foot">fuel · train · recover — you've got this, Harriet ♡</p>
-  </main>
+        <section class="stats">
+          <div class="stat"><div class="n" id="stat-race">–</div><div class="l" id="stat-race-l">days to next race</div></div>
+          <div class="stat"><div class="n" id="stat-week">0/0</div><div class="l">this week</div>
+            <div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
+          <div class="stat"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
+          <div class="stat"><div class="n" id="stat-total">0</div><div class="l">sessions banked</div></div>
+        </section>
+
+        <!-- 80/20 polarized gauge -->
+        <section class="polar">
+          <div class="polar-head">
+            <div><div class="polar-kicker">This week · 80/20 polarized</div>
+              <div class="polar-sub" id="polarSub">Seiler's rule — go mostly easy, so the hard days count.</div></div>
+            <div class="polar-badge" id="polarBadge">–</div>
+          </div>
+          <div class="polar-bar"><i class="pb-easy" id="pbEasy" style="width:80%"></i><i class="pb-hard" id="pbHard" style="width:20%"></i></div>
+          <div class="polar-legend">
+            <span><i class="pl-dot easy"></i> Easy / aerobic <b id="pbEasyPct">80%</b></span>
+            <span><i class="pl-dot hard"></i> Hard / quality <b id="pbHardPct">20%</b></span>
+          </div>
+        </section>
+
+        <!-- Up next — structured from today -->
+        <section class="upnext" id="upnext">
+          <div class="upnext-head"><span class="upnext-kicker">Up next · from today</span></div>
+          <div class="upnext-list" id="upnextList"></div>
+        </section>
+
+        <div class="cal-head">
+          <h2 id="cal-title">Month</h2>
+          <div class="cal-nav">
+            <button class="btn" id="prev" aria-label="Previous month">‹</button>
+            <button class="btn solid" id="todayBtn">Today</button>
+            <button class="btn" id="next" aria-label="Next month">›</button>
+          </div>
+        </div>
+        <div class="weekdays"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></div>
+        <div class="grid" id="grid"></div>
+
+        <div class="legend" id="legend"></div>
+        <p class="hint">Tap any day for the sessions · open a workout for the full breakdown · tick things off as you go. Everything saves on this device.</p>
+        <button class="reset-link" id="resetBtn">reset all progress</button>
+      </section>
+
+      <!-- ===== BLOCKS VIEW ===== -->
+      <section id="view-blocks" hidden>
+        <div class="blocks-intro">
+          <h2>The macro plan</h2>
+          <p>One continuous build, five blocks, three races. It follows the <b>80/20 polarized model</b> — the vast majority easy and aerobic, a small sharp slice hard. That's what turns months of Zone 2 into an Ironman.</p>
+        </div>
+        <div class="blocks-list" id="blocksList"></div>
+        <div class="ali-card">
+          <div class="ali-quote" id="aliQuote"></div>
+          <div class="ali-sign">— Ali ♡</div>
+        </div>
+      </section>
+
+      <p class="foot">built by Ali — for the strongest girl I know ♡</p>
+      <p class="foot-mini">Garmin sync &amp; cloud save coming soon</p>
+    </main>
+  </div>
 
   <!-- drawer -->
   <div class="scrim" id="scrim"></div>
   <aside class="drawer" id="drawer" aria-label="Day detail">
-    <div class="drawer-head">
+    <div class="drawer-head" id="drawer-head">
       <button class="dclose" id="dclose" aria-label="Close">×</button>
       <div class="dphase" id="d-phase"></div>
       <h3 id="d-title"></h3>
