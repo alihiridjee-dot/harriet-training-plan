@@ -61,9 +61,9 @@
           <h1 class="ph-title">Harriet's Season</h1>
           <p class="ph-sub">Every session, stacked up, becomes an Ironman. Easy days easy, hard days hard.</p>
           <div class="race-chips" id="goals">
-            <button class="goal-btn" data-race="sprint"><b>Sprint Triathlon</b><span class="g-date">26 Sep 2026</span></button>
-            <button class="goal-btn" data-race="half"><b>Ipswich Half · sub-2</b><span class="g-date">27 Sep 2026</span></button>
-            <button class="goal-btn g-key" data-race="iron"><b>Ironman 70.3</b><span class="g-date">Apr / May 2027</span></button>
+            <button class="goal-btn g-sprint" data-race="sprint"><span class="g-emoji">🏊‍♀️🚴‍♀️🏃‍♀️</span><b>Sprint Triathlon</b><span class="g-date">📅 26 Sep 2026</span></button>
+            <button class="goal-btn g-half" data-race="half"><span class="g-emoji">🏅 sub-2</span><b>Ipswich Half</b><span class="g-date">📅 27 Sep 2026</span></button>
+            <button class="goal-btn g-key g-iron" data-race="iron"><span class="g-emoji">🔥 the big one</span><b>Ironman 70.3</b><span class="g-date">📅 Apr / May 2027</span></button>
           </div>
         </header>
 
@@ -197,6 +197,7 @@
       <p>Enter the PIN to tick off sessions, add notes and swap days.</p>
       <input type="password" inputmode="numeric" id="pinInput" placeholder="• • • •" maxlength="8" autocomplete="off">
       <div class="pin-err" id="pinErr"></div>
+      <label class="pin-trust"><input type="checkbox" id="pinTrust" checked> Trust this device — don't ask again</label>
       <div class="modal-actions">
         <button class="btn" id="pinCancel">Cancel</button>
         <button class="btn solid" id="pinOk">Unlock</button>
