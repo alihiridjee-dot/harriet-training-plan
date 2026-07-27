@@ -275,10 +275,20 @@ button{font-family:inherit;cursor:pointer;}
 .dact.ghost{background:transparent;}
 .swap-picker{margin-top:12px;background:rgba(255,255,255,.14);border-radius:var(--r-sm);padding:10px;}
 .swap-picker .sp-label{font-size:11.5px;font-weight:600;color:#fff;opacity:.9;margin-bottom:8px;}
-.swap-days{display:flex;gap:6px;flex-wrap:wrap;max-height:210px;overflow-y:auto;padding:2px;}
-.sp-day{background:rgba(255,255,255,.92);color:var(--ink);border:none;border-radius:10px;padding:7px 10px;font-weight:600;font-size:12px;cursor:pointer;transition:.15s;min-width:52px;text-align:center;line-height:1.25;}
-.sp-day:hover{background:#fff;transform:translateY(-1px);}
-.sp-day small{display:block;font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;}
+.mini-grid{background:rgba(255,255,255,.95);border-radius:12px;padding:10px;}
+.mg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.mg-title{font-weight:700;font-size:13px;color:var(--ink);}
+.mg-nav{width:26px;height:26px;border:none;border-radius:8px;background:var(--sand-s,#eee);color:var(--ink);font-size:15px;font-weight:700;cursor:pointer;line-height:1;transition:.15s;}
+.mg-nav:hover{background:var(--iron,#c0392b);color:#fff;}
+.mg-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:3px;}
+.mg-dow span{text-align:center;font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;}
+.mg-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+.mg-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border:none;border-radius:8px;font-size:12px;font-weight:600;background:transparent;color:var(--ink);}
+.mg-cell.empty{background:transparent;}
+.mg-cell.none{color:#c7c2b8;}
+.mg-cell.has{background:var(--sand-s,#f0ece3);color:var(--ink);cursor:pointer;transition:.13s;}
+.mg-cell.has:hover{background:var(--iron,#c0392b);color:#fff;transform:translateY(-1px);}
+.mg-cell.self{background:var(--iron,#c0392b);color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.6);}
 .drawer-body{padding:20px 22px 40px;overflow-y:auto;flex:1;}
 .banner{background:var(--sand-s);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px 15px;font-size:13.5px;color:var(--sand-d);margin-bottom:16px;font-weight:500;line-height:1.45;}
 .sess{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);padding:14px;margin-bottom:12px;box-shadow:var(--sh-1);}
