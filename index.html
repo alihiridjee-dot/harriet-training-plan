@@ -8,12 +8,12 @@
 <meta name="theme-color" content="#1c2836">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Nunito:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500&family=Caveat:wght@500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
 
-  <!-- ============ SPLASH · IRONMAN M-DOT ============ -->
+  <!-- ============ LANDING ============ -->
   <div class="splash" id="splash" role="img" aria-label="Ironman — Harriet's journey">
     <div class="splash-inner">
       <svg class="mdot" viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
@@ -24,91 +24,118 @@
       <div class="splash-word">IRONMAN <span>70.3</span></div>
       <div class="splash-name">Harriet's journey</div>
       <div class="splash-sig">for you — from Ali ♡</div>
+      <button class="splash-enter" id="splashSkip">Enter <span>→</span></button>
     </div>
-    <button class="splash-skip" id="splashSkip">enter ›</button>
   </div>
 
-  <!-- ============ MAIN APP ============ -->
+  <!-- ============ APP ============ -->
   <div class="app" id="app">
 
-    <header class="hero">
-      <div class="hero-wrap">
-        <div class="hero-row">
-          <div>
-            <div class="hero-kicker">Season 2026 – 2027 · one build, three races</div>
-            <h1 class="hero-title">Harriet's Season</h1>
-            <p class="hero-sub">Every session, stacked up, becomes an Ironman. Easy days easy, hard days hard.</p>
-          </div>
-          <div class="hero-mark" aria-hidden="true">
-            <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg">
-              <circle cx="150" cy="66" r="55"/>
-              <path d="M95,150 L205,150 L205,300 L173,300 L161,226 L150,259 L139,226 L127,300 L95,300 Z"/>
-            </svg>
-          </div>
+    <!-- sticky nav -->
+    <nav class="topnav">
+      <div class="nav-inner">
+        <div class="nav-brand">
+          <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <circle cx="150" cy="66" r="55"/><path d="M95,150 L205,150 L205,300 L173,300 L161,226 L150,259 L139,226 L127,300 L95,300 Z"/>
+          </svg>
+          <span>Harriet's Season</span>
         </div>
-
-        <div class="goals">
-          <div class="goal"><b>Sprint Triathlon</b><span class="g-date">26 Sep 2026</span></div>
-          <div class="goal"><b>Ipswich Half · sub-2</b><span class="g-date">27 Sep 2026</span></div>
-          <div class="goal g-key"><b>Ironman 70.3</b><span class="g-date">Apr / May 2027</span></div>
+        <div class="segmented" role="tablist">
+          <button class="seg active" data-view="calendar" role="tab">Calendar</button>
+          <button class="seg" data-view="blocks" role="tab">Blocks</button>
+        </div>
+        <div class="tools">
+          <span class="sync-pill" id="syncPill" title="Sync status"><i class="dot"></i><span id="syncText">connecting…</span></span>
+          <button class="lock-btn" id="editLock" title="Edit access">🔒</button>
         </div>
       </div>
-    </header>
+    </nav>
 
     <main class="wrap">
-
-      <!-- segmented tab control -->
-      <div class="segmented" role="tablist">
-        <button class="seg active" data-view="calendar" role="tab">Calendar</button>
-        <button class="seg" data-view="blocks" role="tab">The Blocks</button>
-      </div>
 
       <!-- ===== CALENDAR VIEW ===== -->
       <section id="view-calendar">
 
+        <header class="page-head">
+          <div class="ph-kicker">Season 2026 – 2027 · one build, three races</div>
+          <h1 class="ph-title">Harriet's Season</h1>
+          <p class="ph-sub">Every session, stacked up, becomes an Ironman. Easy days easy, hard days hard.</p>
+          <div class="race-chips" id="goals">
+            <button class="goal-btn" data-race="sprint"><b>Sprint Triathlon</b><span class="g-date">26 Sep 2026</span></button>
+            <button class="goal-btn" data-race="half"><b>Ipswich Half · sub-2</b><span class="g-date">27 Sep 2026</span></button>
+            <button class="goal-btn g-key" data-race="iron"><b>Ironman 70.3</b><span class="g-date">Apr / May 2027</span></button>
+          </div>
+        </header>
+
         <div class="coach-note" id="coachNote"></div>
 
-        <section class="stats">
-          <div class="stat"><div class="n" id="stat-race">–</div><div class="l" id="stat-race-l">days to next race</div></div>
-          <div class="stat"><div class="n" id="stat-week">0/0</div><div class="l">this week</div>
-            <div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
-          <div class="stat"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
-          <div class="stat"><div class="n" id="stat-total">0</div><div class="l">sessions banked</div></div>
+        <!-- calendar card -->
+        <section class="cal-card">
+          <div class="cal-head">
+            <div class="cal-head-l">
+              <h2 id="cal-title">Month</h2>
+              <div class="cal-sub"><span id="stat-race">–</span> <span id="stat-race-l">days to next race</span></div>
+            </div>
+            <div class="cal-nav">
+              <button class="btn" id="prev" aria-label="Previous month">‹</button>
+              <button class="btn" id="todayBtn">Today</button>
+              <button class="btn" id="next" aria-label="Next month">›</button>
+              <button class="btn ghost" id="expandBtn" title="Full day-by-day view">⤢</button>
+            </div>
+          </div>
+
+          <div class="focus-banner" id="focusBanner" hidden><span id="focusText"></span><button id="focusClear">clear ✕</button></div>
+
+          <div class="weekdays"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></div>
+
+          <div class="cal-stage" id="calStage">
+            <div class="grid" id="grid"></div>
+            <div class="flip-cal" id="flipCal" aria-hidden="true">
+              <div class="fc-base">
+                <div class="fc-rings"><span></span><span></span></div>
+                <div class="fc-page" id="fcPage">
+                  <div class="fc-weekday" id="fcWeekday">—</div>
+                  <div class="fc-day" id="fcDay">—</div>
+                  <div class="fc-month" id="fcMonth">—</div>
+                  <div class="fc-year" id="fcYear">—</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="legend" id="legend"></div>
         </section>
 
-        <!-- 80/20 polarized gauge -->
-        <section class="polar">
-          <div class="polar-head">
-            <div><div class="polar-kicker">This week · 80/20 polarized</div>
-              <div class="polar-sub" id="polarSub">Seiler's rule — go mostly easy, so the hard days count.</div></div>
-            <div class="polar-badge" id="polarBadge">–</div>
+        <!-- insights -->
+        <section class="insights">
+          <div class="ins-stats">
+            <div class="ins-stat"><div class="n" id="stat-week">0/0</div><div class="l">this week</div><div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
+            <div class="ins-div"></div>
+            <div class="ins-stat"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
+            <div class="ins-div"></div>
+            <div class="ins-stat"><div class="n" id="stat-total">0</div><div class="l">sessions banked</div></div>
           </div>
-          <div class="polar-bar"><i class="pb-easy" id="pbEasy" style="width:80%"></i><i class="pb-hard" id="pbHard" style="width:20%"></i></div>
-          <div class="polar-legend">
-            <span><i class="pl-dot easy"></i> Easy / aerobic <b id="pbEasyPct">80%</b></span>
-            <span><i class="pl-dot hard"></i> Hard / quality <b id="pbHardPct">20%</b></span>
+          <div class="ins-polar">
+            <div class="polar-head">
+              <div class="polar-kicker">This week · 80/20 polarized</div>
+              <div class="polar-badge" id="polarBadge">–</div>
+            </div>
+            <div class="polar-bar"><i class="pb-easy" id="pbEasy" style="width:80%"></i><i class="pb-hard" id="pbHard" style="width:20%"></i></div>
+            <div class="polar-legend">
+              <span><i class="pl-dot easy"></i> Easy <b id="pbEasyPct">80%</b></span>
+              <span><i class="pl-dot hard"></i> Hard <b id="pbHardPct">20%</b></span>
+              <span class="polar-sub" id="polarSub">mostly easy, so the hard days count.</span>
+            </div>
           </div>
         </section>
 
-        <!-- Up next — structured from today -->
+        <!-- up next -->
         <section class="upnext" id="upnext">
           <div class="upnext-head"><span class="upnext-kicker">Up next · from today</span></div>
           <div class="upnext-list" id="upnextList"></div>
         </section>
 
-        <div class="cal-head">
-          <h2 id="cal-title">Month</h2>
-          <div class="cal-nav">
-            <button class="btn" id="prev" aria-label="Previous month">‹</button>
-            <button class="btn solid" id="todayBtn">Today</button>
-            <button class="btn" id="next" aria-label="Next month">›</button>
-          </div>
-        </div>
-        <div class="weekdays"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></div>
-        <div class="grid" id="grid"></div>
-
-        <div class="legend" id="legend"></div>
-        <p class="hint">Tap any day for the sessions · open a workout for the full breakdown · tick things off as you go. Everything saves on this device.</p>
+        <p class="hint">Tap any day for the sessions · open a workout for the full breakdown · swap days if you feel like moving a session around.</p>
         <button class="reset-link" id="resetBtn">reset all progress</button>
       </section>
 
@@ -125,8 +152,10 @@
         </div>
       </section>
 
-      <p class="foot">built by Ali — for the strongest girl I know ♡</p>
-      <p class="foot-mini">Garmin sync &amp; cloud save coming soon</p>
+      <footer class="site-foot">
+        <p class="foot">built by Ali — for the strongest girl I know ♡</p>
+        <p class="foot-mini">Garmin sync coming soon · progress syncs across your devices</p>
+      </footer>
     </main>
   </div>
 
@@ -139,11 +168,44 @@
       <h3 id="d-title"></h3>
       <div class="ddate" id="d-date"></div>
       <span class="devent" id="d-event" style="display:none"></span>
+      <div class="dactions">
+        <button class="dact" id="swapBtn">⇄ Swap this day</button>
+        <button class="dact ghost" id="resetDayBtn" hidden>↺ reset day</button>
+      </div>
+      <div class="swap-picker" id="swapPicker" hidden></div>
     </div>
     <div class="drawer-body" id="d-body"></div>
   </aside>
 
-  <script src="data.js"></script>
-  <script src="app.js"></script>
+  <!-- agenda overlay -->
+  <div class="agenda" id="agenda" hidden>
+    <div class="agenda-head">
+      <div class="agenda-nav">
+        <button class="btn" id="agPrev">‹</button>
+        <h2 id="agTitle">Month</h2>
+        <button class="btn" id="agNext">›</button>
+      </div>
+      <button class="btn solid" id="agClose">Done</button>
+    </div>
+    <div class="agenda-body" id="agendaBody"></div>
+  </div>
+
+  <!-- PIN modal -->
+  <div class="modal-scrim" id="pinScrim" hidden>
+    <div class="modal">
+      <h3>Unlock editing</h3>
+      <p>Enter the PIN to tick off sessions, add notes and swap days.</p>
+      <input type="password" inputmode="numeric" id="pinInput" placeholder="• • • •" maxlength="8" autocomplete="off">
+      <div class="pin-err" id="pinErr"></div>
+      <div class="modal-actions">
+        <button class="btn" id="pinCancel">Cancel</button>
+        <button class="btn solid" id="pinOk">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="data.js?v=7"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>

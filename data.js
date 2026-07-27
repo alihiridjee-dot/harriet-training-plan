@@ -72,6 +72,31 @@
     { label: "Cool-down", text: "200 m easy." }
   ]);
 
+  // ---------- pre-September swims (capped ~1,000–1,100 m) ----------
+  // Harriet's max to date is ~1,100 m and the Sprint swim is only 750 m, so
+  // there's no need to swim beyond ~1,100 m before September. These build
+  // confidence and pace at the right distance, not junk volume.
+  const SWIM_P1_TECH = (note) => S("swim", "Swim — technique & drills" + (note ? " · " + note : ""), "≈ 1,000 m · 25 m pool", [
+    { label: "Warm-up", text: "200 m easy, relaxed breathing every 3." },
+    { label: "Drills", text: "6 × 50 m — catch-up · single-arm · fingertip-drag, @ :20. Long reach, high elbow." },
+    { label: "Drill/swim", text: "4 × 100 m = 25 drill + 75 smooth swim, @ :25." },
+    { label: "Cool-down", text: "100 m easy, bilateral breathing (every 3)." },
+    { label: "Why capped", text: "Well within your 1,100 m best — the Sprint swim is just 750 m, so we sharpen technique, not distance." }
+  ]);
+  const SWIM_P1_CSS = () => S("swim", "Swim — CSS / pace", "≈ 1,000 m", [
+    { label: "Warm-up", text: "200 m easy + 4 × 50 build @ :20." },
+    { label: "Main", text: "8 × 75 m at strong, steady 'race' pace, @ :15. Even effort, controlled breathing." },
+    { label: "Test option", text: "Now and then swap in a 200 m time-trial (record it) to track your CSS/100 m." },
+    { label: "Cool-down", text: "200 m easy." }
+  ]);
+  const SWIM_P1_ENDUR = () => S("swim", "Swim — steady endurance", "≈ 1,000–1,100 m", [
+    { label: "Warm-up", text: "200 m mixed + 4 × 50 drill @ :20." },
+    { label: "Main", text: "Build across the block: 4 → 5 → 6 × 150 m steady, @ :20 — comfortable, repeatable pace." },
+    { label: "Pull", text: "2 × 100 m pull-buoy, smooth & long, @ :20." },
+    { label: "Cool-down", text: "100 m easy." },
+    { label: "Goal", text: "Feel like 750 m is easy and repeatable by race day — that's a Sprint swim done comfortably." }
+  ]);
+
   const BIKE_B1 = (label, sub) => S("bike", label || "Bike — endurance", sub || "Z2 · cadence 85–95", [
     { label: "Main", text: "Ride at 22–25 km/h in Zone 2 — able to chat. Spin light gears at 85–95 rpm." },
     { label: "Skill", text: "Practise eating & drinking on the move, and spend time in a lower / aero-ish position." }
@@ -150,7 +175,7 @@
       const camp = [
         [MOB("30–40 min easy shakeout jog + mobility"), S("mobility", "Travel day", "Camp · Day 1", [{ label: "Note", text: "Arrive, unpack, legs loose. Nothing hard." }])],
         [LONG_BIKE("Big mountain ride · 3–4 h", "Camp · Day 2 · by time, not distance", [{ label: "Main", text: "3–4 hours on the climbs. Stay in Zone 2 on ascents — walk-pace spinning is fine. Fuel 40–60 g carbs/hour." }, BRICK("10 min (optional)")])],
-        [S("run", "Hill run · 60–75 min", "Camp · Day 3", [{ label: "Main", text: "Easy up the climbs (walk the steep bits), plus 6–8 short uphill surges near the end." }]), SWIM_S1("easy technique if pool")],
+        [S("run", "Hill run · 60–75 min", "Camp · Day 3", [{ label: "Main", text: "Easy up the climbs (walk the steep bits), plus 6–8 short uphill surges near the end." }]), SWIM_P1_TECH("easy technique if pool")],
         [S("mobility", "Recovery spin or hike", "Camp · Day 4", [{ label: "Main", text: "Easy recovery spin or a hike + mobility. Absorb the big days." }])],
         [BIKE_B1("Bike — easy", "post-camp / travel · 40 min or rest")],
         [LONG_BIKE("Easy long ride · 40–50 km", "Z2 (skip if still tired)", [{ label: "Main", text: "Only if recovered from camp — otherwise rest. Keep it easy Zone 2." }])],
@@ -161,7 +186,7 @@
     // Week 9 — race week
     if (week === 9) {
       const rw = [
-        [SWIM_S1("short & smooth, 20 min")],
+        [SWIM_P1_TECH("short & smooth, 20 min")],
         [S("run", "Openers", "3 × 1 min brisk", [{ label: "Main", text: "15 min easy + 3 × 1 min brisk (10K effort), full recovery. Wakes the legs up without tiring them." }]), MOB("light mobility only — no lifting")],
         [BIKE_B1("Easy spin · 25 km", "legs loose"), S("swim", "Optional short swim", "15 min easy", [{ label: "Note", text: "Optional — only if it helps you feel loose." }])],
         [S("run", "Shakeout · 5 km", "+ 4 strides", [{ label: "Main", text: "5 km very easy + 4 strides. Loose, not tiring." }])],
@@ -185,8 +210,8 @@
     const tmpl = [
       [REST()],
       [k.tue, LOWER()],
-      [SWIM_S1(k.swimNote), UPPER()],
-      [EASY_RUN("6–8 km", week >= 3), k.swimThuTest ? SWIM_S2() : SWIM_S3()],
+      [SWIM_P1_TECH(k.swimNote), UPPER()],
+      [EASY_RUN("6–8 km", week >= 3), k.swimThuTest ? SWIM_P1_CSS() : SWIM_P1_ENDUR()],
       [BIKE_B1("Bike — endurance", "45–60 min Z2 (or swap to rest)")],
       [k.sat],
       [k.sun]
