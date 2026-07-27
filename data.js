@@ -143,6 +143,32 @@
     { label: "Cool-down", text: "10 min easy." }
   ]);
 
+  // ---------- unified half-marathon run framework (Runna-style) ----------
+  // 3 runs every week, today → end of May: one QUALITY (rotating hills / tempo /
+  // intervals), one EASY, one LONG that builds up — with a taper into each race.
+  // Placed Tue = quality, Thu = easy, Sun = long across every block.
+  function weeklyRuns(isoStr) {
+    const wk = Math.floor(daysBetween(PLAN_START, isoStr) / 7); // 0-based plan week
+    // quality rotation — hills, tempo, intervals, threshold, cruise
+    const quality = [R6(), R4("20 min continuous"), R2(), R3("5 × 1 km"), R6(), R5()][wk % 6];
+    const easy = EASY_RUN("6–8 km", wk % 2 === 0);
+    // long run — progressive build with a step-back every 4th week, tapering before races
+    const dS = daysBetween(isoStr, SPRINT_TRI), dR = daysBetween(isoStr, RACE_703);
+    const taperD = d => d >= 0 && d <= 13;
+    let long;
+    if (taperD(dS) || taperD(dR)) {
+      const veryClose = (dS >= 0 && dS <= 6) || (dR >= 0 && dR <= 6);
+      long = LONG_RUN(veryClose ? "8 km" : "10–12 km", "Taper — short and easy. Freshness beats fitness now; save it for race day.");
+    } else {
+      const cyc = wk % 4;
+      let km = Math.min(12 + wk * 0.4, 20);
+      if (cyc === 3) km = Math.max(10, km - 4); // recovery / step-back week
+      km = Math.round(km);
+      long = LONG_RUN(km + " km", cyc === 2 ? "Final 3–4 km lifted to steady half-marathon effort — controlled, not a sprint." : (cyc === 3 ? "Easy step-back week — let the build settle in." : null));
+    }
+    return { quality: quality, easy: easy, long: long };
+  }
+
   // ---------- phase-1 key sessions per week ----------
   // Each: { tue, sat, sun }  (sat/sun are custom long sessions)
   const P1 = {
@@ -206,15 +232,15 @@
       return dayObj(week, wd, isoStr, rw[wd], "Race week — everything is short. Rest is the priority; arrive fresh over fried.");
     }
     // Normal phase-1 week from template + weekly key sessions
-    const k = P1[week];
+    const k = P1[week], run = weeklyRuns(isoStr);
     const tmpl = [
       [REST()],
-      [k.tue, LOWER()],
+      [run.quality, LOWER()],
       [SWIM_P1_TECH(k.swimNote), UPPER()],
-      [EASY_RUN("6–8 km", week >= 3), k.swimThuTest ? SWIM_P1_CSS() : SWIM_P1_ENDUR()],
+      [run.easy, k.swimThuTest ? SWIM_P1_CSS() : SWIM_P1_ENDUR()],
       [BIKE_B1("Bike — endurance", "45–60 min Z2 (or swap to rest)")],
       [k.sat],
-      [k.sun]
+      [run.long]
     ];
     return dayObj(week, wd, isoStr, tmpl[wd]);
   }
@@ -232,20 +258,20 @@
     return { sessions: t[wd], banner: "Reset block — deliberately easy. No hard sessions, no long runs over 10 km. Recharge." };
   }
 
-  function baseDay(wd, weekIdx) {
+  function baseDay(wd, weekIdx, isoStr) {
     const bi = weekIdx - 11; // weeks into base
     const bikeKm = Math.min(50 + bi * 3, 70);
-    const runKm = Math.min(12 + Math.floor(bi / 2), 16);
+    const run = weeklyRuns(isoStr);
     const t = [
       [REST()],
-      [EASY_RUN("6–8 km", true), LOWER()],
+      [run.quality, LOWER()],
       [SWIM_S1("winter technique project"), UPPER()],
-      [EASY_RUN("7–8 km", true), SWIM_S3()],
+      [run.easy, SWIM_S3()],
       [BIKE_B1("Bike — endurance", "60–75 min Z2")],
       [LONG_BIKE("Long ride · " + bikeKm + " km", "Z2 easy", [{ label: "Main", text: "Almost all Zone 2 — building the aerobic engine. Cadence 85–95." }])],
-      [LONG_RUN(runKm + " km", "Easy — base miles.")]
+      [run.long]
     ];
-    return { sessions: t[wd], banner: "Base block — mostly Zone 2. Aerobic engine + the winter swim project. Framework: we'll refine numbers nearer the time." };
+    return { sessions: t[wd], banner: "Base block — half-marathon run spine (long · quality · easy) plus Zone-2 bike & the winter swim project." };
   }
 
   function buildDay(wd, isoStr) {
@@ -254,16 +280,17 @@
     const brick = Math.min(15 + bi * 2, 30);
     const runKm = Math.min(16 + Math.floor(bi / 2), 20);
     const swimReps = Math.min(6 + bi, 12);
+    const run = weeklyRuns(isoStr);
     const t = [
       [REST()],
-      [R4("2 × 12 min tempo"), LOWER()],
+      [run.quality, LOWER()],
       [SWIM_S1("+ open-water skills from spring"), UPPER()],
-      [EASY_RUN("8–10 km", true), S("swim", "Swim — endurance", swimReps + " × 200 m @ CSS", [{ label: "Main", text: swimReps + " × 200 m @ CSS + 3–5 s, @ :20 — building toward the 1.9 km race distance." }, { label: "Then", text: "4 × 100 m pull, smooth. Cool-down 200 m." }])],
+      [run.easy, S("swim", "Swim — endurance", swimReps + " × 200 m @ CSS", [{ label: "Main", text: swimReps + " × 200 m @ CSS + 3–5 s, @ :20 — building toward the 1.9 km race distance." }, { label: "Then", text: "4 × 100 m pull, smooth. Cool-down 200 m." }])],
       [BIKE_B1("Bike — endurance", "75–90 min Z2")],
       [LONG_BIKE("Race brick · " + bikeKm + " km + " + brick + "′ run", "key 70.3 session", [{ label: "Bike", text: bikeKm + " km building toward 90 km, mostly Z2 with sweet-spot blocks." }, { label: "Fuel", text: "Rehearse race nutrition: 60–90 g carbs/hour." }, BRICK(brick + " min at 70.3 pace (Z3, ~9.7–10.1 km/h)")])],
-      [LONG_RUN(runKm + " km", "Final third at steady / 70.3 pace.")]
+      [run.long]
     ];
-    return { sessions: t[wd], banner: "70.3 Build — the weekend brick is the key session. Framework distances shown; we'll dial these to your spring fitness." };
+    return { sessions: t[wd], banner: "70.3 Build — the weekend brick is the key session, wrapped around the 3-run half-marathon spine (quality · easy · long)." };
   }
 
   function taperDay(wd, isoStr) {
@@ -305,7 +332,7 @@
     if (phase.id === "pre") body = { sessions: [], banner: null };
     else if (phase.id === "p1") body = p1Day(weekIdx + 1, wd, isoStr);
     else if (phase.id === "recovery") body = recoveryDay(wd);
-    else if (phase.id === "base") body = baseDay(wd, weekIdx);
+    else if (phase.id === "base") body = baseDay(wd, weekIdx, isoStr);
     else if (phase.id === "build") body = buildDay(wd, isoStr);
     else if (phase.id === "taper") body = taperDay(wd, isoStr);
     else body = postDay();
@@ -356,11 +383,11 @@
     { id: "base", n: 3, name: "Base", start: "2026-10-12", end: "2026-12-31",
       points: "70.3 foundation", tint: "base",
       focus: "Aerobic base + the winter swim project. Mostly Zone 2 — the 80% that earns the hard 20%.",
-      key: ["Zone-2 long ride", "Base long run", "Swim technique", "Strength ×2"] },
+      key: ["Long run (building)", "Quality run", "Easy run", "Zone-2 ride", "Swim technique"] },
     { id: "build", n: 4, name: "70.3 Build", start: "2027-01-01", end: "2027-04-18",
       points: "Ironman 70.3", tint: "build",
       focus: "The weekend race brick becomes the key session — building toward 90 km + a strong run off the bike.",
-      key: ["Race brick", "Tempo run", "CSS swim endurance", "Long run"] },
+      key: ["Race brick", "Long run (building)", "Quality run", "Easy run", "CSS swim"] },
     { id: "taper", n: 5, name: "Peak & Taper", start: "2027-04-19", end: RACE_703,
       points: "Ironman 70.3", tint: "taper",
       focus: "Volume drops, a little sharpness stays. Rehearse everything, then rest so you arrive fresh, not fried.",

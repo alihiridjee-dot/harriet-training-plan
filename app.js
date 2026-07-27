@@ -10,7 +10,7 @@
   const SB_URL = "https://notibogaoeqakmeyxhar.supabase.co";
   const SB_KEY = "sb_publishable_PzxYn1w0zQwHku16EPtTXQ_GGan7WEL";
   const ATHLETE_ID = "harriet";
-  const EDIT_PIN = "0926";            // ← change me (Sprint race day 26 Sep). PIN to unlock editing.
+  const EDIT_PIN = "6569";            // PIN to unlock editing.
   const LOCAL_KEY = "htp_v2";
 
   const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
@@ -63,7 +63,7 @@
   function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
 
   // ---------- PIN / edit lock ----------
-  let editing = sessionStorage.getItem("htp_edit") === "1";
+  let editing = sessionStorage.getItem("htp_edit") === "1" || localStorage.getItem("htp_trust") === "1";
   function setLockUI() {
     const b = document.getElementById("editLock"), app = document.getElementById("app");
     if (editing) { b.textContent = "🔓 Editing"; b.classList.add("unlocked"); app.classList.remove("locked"); }
@@ -78,7 +78,9 @@
   function closePin() { document.getElementById("pinScrim").hidden = true; }
   function tryPin() {
     if (document.getElementById("pinInput").value === EDIT_PIN) {
-      editing = true; sessionStorage.setItem("htp_edit", "1"); setLockUI(); closePin();
+      editing = true; sessionStorage.setItem("htp_edit", "1");
+      if (document.getElementById("pinTrust").checked) localStorage.setItem("htp_trust", "1");
+      setLockUI(); closePin();
       if (currentIso) openDrawer(currentIso);
     } else { document.getElementById("pinErr").textContent = "Wrong PIN — try again"; document.getElementById("pinInput").value = ""; }
   }
@@ -328,27 +330,48 @@
         '<div class="block-focus">' + b.focus + '</div><div class="block-key">' + b.key.map(k => '<span>' + k + '</span>').join('') + '</div></div>';
     });
     wrap.innerHTML = html;
-    const q = ["Watching you chase this is the proudest I've ever been.",
-      "You don't have to be fast. You just have to keep showing up. And you always do.",
-      "Every early alarm, every hard set — I see all of it. You're incredible.",
-      "One day I'll watch you cross that finish line and my heart will burst."];
-    document.getElementById("aliQuote").textContent = q[Math.floor(Math.random() * q.length)];
+    document.getElementById("aliQuote").textContent = "There is no way around the hard work. Embrace it.";
   }
 
   // ---------- drawer ----------
   const scrim = document.getElementById("scrim"), drawer = document.getElementById("drawer");
+  let swapView = null; // {y, m} month currently shown in the mini-grid
   function buildSwapPicker(isoStr) {
+    const dt0 = TP.parse(isoStr);
+    swapView = { y: dt0.getFullYear(), m: dt0.getMonth() };
+    renderSwapGrid(isoStr);
+  }
+  function renderSwapGrid(isoStr) {
     const picker = document.getElementById("swapPicker");
-    let days = "";
-    for (let off = -7; off <= 7; off++) {
-      if (off === 0) continue;
-      const d = TP.addDays(isoStr, off);
-      if (!sessionsOfDay(d).filter(s => s.type !== "rest").length) continue;
-      const dt = TP.parse(d);
-      days += '<button class="sp-day" data-iso="' + d + '"><small>' + DOW[TP.weekdayMon0(d)] + '</small>' + dt.getDate() + ' ' + MON_ABBR[dt.getMonth()] + '</button>';
+    const y = swapView.y, m = swapView.m;
+    const first = new Date(y, m, 1), pad = (first.getDay() + 6) % 7, dim = new Date(y, m + 1, 0).getDate();
+    let cells = "";
+    for (let i = 0; i < pad; i++) cells += '<span class="mg-cell empty"></span>';
+    for (let d = 1; d <= dim; d++) {
+      const dISO = TP.iso(new Date(y, m, d, 12));
+      const has = sessionsOfDay(dISO).filter(s => s.type !== "rest").length > 0;
+      const isSelf = dISO === isoStr;
+      const cls = "mg-cell" + (isSelf ? " self" : "") + (has && !isSelf ? " has" : "") + (!has ? " none" : "");
+      cells += isSelf
+        ? '<span class="' + cls + '">' + d + '</span>'
+        : (has ? '<button class="' + cls + '" data-iso="' + dISO + '">' + d + '</button>'
+               : '<span class="' + cls + '">' + d + '</span>');
     }
-    picker.innerHTML = '<div class="sp-label">Swap this whole day with…</div><div class="swap-days">' + days + '</div>';
-    picker.querySelectorAll(".sp-day").forEach(b => b.addEventListener("click", () => { if (ensureEdit()) swapDays(isoStr, b.getAttribute("data-iso")); }));
+    picker.innerHTML =
+      '<div class="sp-label">Swap this whole day with any day…</div>' +
+      '<div class="mini-grid">' +
+        '<div class="mg-head"><button class="mg-nav" data-nav="-1">‹</button>' +
+          '<span class="mg-title">' + MONTHS[m] + ' ' + y + '</span>' +
+          '<button class="mg-nav" data-nav="1">›</button></div>' +
+        '<div class="mg-dow">' + DOW.map(x => '<span>' + x[0] + '</span>').join('') + '</div>' +
+        '<div class="mg-grid">' + cells + '</div>' +
+      '</div>';
+    picker.querySelectorAll(".mg-nav").forEach(b => b.addEventListener("click", () => {
+      swapView.m += Number(b.getAttribute("data-nav"));
+      if (swapView.m < 0) { swapView.m = 11; swapView.y--; } else if (swapView.m > 11) { swapView.m = 0; swapView.y++; }
+      renderSwapGrid(isoStr);
+    }));
+    picker.querySelectorAll(".mg-cell.has").forEach(b => b.addEventListener("click", () => { if (ensureEdit()) swapDays(isoStr, b.getAttribute("data-iso")); }));
   }
   function openDrawer(isoStr) {
     currentIso = isoStr;
