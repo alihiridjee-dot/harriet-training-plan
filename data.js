@@ -404,13 +404,13 @@
     PLAN_START, RACE_703, SPRINT_TRI, IPSWICH_HALF, DOLOMITES, BLOCKS, currentBlock,
     getDay, addDays, daysBetween, parse, iso, weekdayMon0, intensityOf,
     TYPE_META: {
-      run:      { label: "Run",      color: "#BC6A4C" },
-      bike:     { label: "Bike",     color: "#43503C" },
-      swim:     { label: "Swim",     color: "#4F7C77" },
-      strength: { label: "Strength", color: "#B48A4E" },
-      mobility: { label: "Mobility", color: "#9A968B" },
-      rest:     { label: "Rest",     color: "#C2BDB1" },
-      race:     { label: "Race",     color: "#A6432A" }
+      run:      { label: "Run",      color: "#B0603A" },
+      bike:     { label: "Bike",     color: "#4C6249" },
+      swim:     { label: "Swim",     color: "#3F6C7B" },
+      strength: { label: "Strength", color: "#A17A3E" },
+      mobility: { label: "Mobility", color: "#6E6480" },
+      rest:     { label: "Rest",     color: "#9C978E" },
+      race:     { label: "Race",     color: "#B4232F" }
     }
   };
   global.TP = TP;
