@@ -112,6 +112,43 @@ Deno.serve(async (req) => {
       return json({ connected: true, activities }, 200, origin);
     }
 
+    // ---- diagnostics: what is intervals.icu actually returning? ----
+    // Never echoes the API key. Safe to call; read-only.
+    if (action === "debug") {
+      const out: Record<string, unknown> = {};
+      const probe = async (label: string, url: string) => {
+        try {
+          const r = await fetch(url, { headers: { Authorization: authHeader() } });
+          const t = await r.text();
+          out[label] = { status: r.status, len: t.length, body: t.slice(0, 400) };
+          return t;
+        } catch (e) {
+          out[label] = { error: String(e) };
+          return "";
+        }
+      };
+
+      // 1. who does this key belong to, and what is the numeric athlete id?
+      const prof = await probe("profile", `${ICU_BASE}/athlete/${ICU_ATHLETE_ID}/profile`);
+      let numericId = "";
+      try {
+        const p = JSON.parse(prof);
+        numericId = String(p?.athlete?.id ?? p?.id ?? "");
+      } catch { /* leave blank */ }
+      out.resolved_athlete_id = numericId || "(could not parse)";
+
+      // 2. activities with the date window we normally use
+      await probe("activities_windowed", `${ICU_BASE}/athlete/${ICU_ATHLETE_ID}/activities?oldest=2015-01-01&newest=2026-12-31`);
+      // 3. activities with no params at all
+      await probe("activities_noparams", `${ICU_BASE}/athlete/${ICU_ATHLETE_ID}/activities`);
+      // 4. same, but against the resolved numeric id rather than "0"
+      if (numericId) {
+        await probe("activities_numeric_id", `${ICU_BASE}/athlete/${numericId}/activities?oldest=2015-01-01&newest=2026-12-31`);
+      }
+
+      return json(out, 200, origin);
+    }
+
     return json({ error: "unknown action" }, 400, origin);
   } catch (e) {
     return json({ error: String(e instanceof Error ? e.message : e) }, 500, origin);
