@@ -67,7 +67,7 @@
   // syncs from Garmin automatically. The API key stays in the edge function —
   // it grants full access to the intervals.icu account, so it never ships here.
   // Flip this to true once the function is deployed (see ICU_SETUP.md).
-  const ICU_SYNC_ENABLED = false;
+  const ICU_SYNC_ENABLED = true;
   const ICU_FN = SB_URL + "/functions/v1/icu-sync";
 
   // intervals.icu activity type → our session type. Unlisted types are ignored.
