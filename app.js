@@ -18,7 +18,7 @@
   const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
   // ---------- state ----------
-  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {} }; }
+  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {}, strava: d.strava || { applied: {} } }; }
   function loadLocal() { try { return normalize(JSON.parse(localStorage.getItem(LOCAL_KEY))); } catch (e) { return normalize(); } }
   function saveLocal() { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); }
   let state = loadLocal();
@@ -61,6 +61,123 @@
     } catch (e) { setSync("offline"); }
   }
   function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
+
+  // ---------- Strava bridge (Garmin → Garmin Connect → Strava → here) ----------
+  // Garmin's own API is business-only, so we ride the sync Harriet already has.
+  // The client secret lives in the edge function; the browser only ever sees
+  // the public client id.
+  const STRAVA_CLIENT_ID = "";                                   // ← paste your Strava app's Client ID
+  const STRAVA_FN = SB_URL + "/functions/v1/strava-sync";
+  const STRAVA_SCOPE = "activity:read_all";
+
+  // Strava sport_type → our session type. Anything unlisted is ignored.
+  const STRAVA_TYPES = {
+    Run: "run", TrailRun: "run", VirtualRun: "run", Treadmill: "run",
+    Ride: "bike", VirtualRide: "bike", GravelRide: "bike", MountainBikeRide: "bike", EBikeRide: "bike",
+    Swim: "swim",
+    WeightTraining: "strength", Crossfit: "strength", Workout: "strength",
+    Yoga: "mobility", Walk: "mobility", Hike: "mobility", Elliptical: "mobility"
+  };
+
+  async function stravaCall(action, extra) {
+    const res = await fetch(STRAVA_FN, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY, "apikey": SB_KEY },
+      body: JSON.stringify(Object.assign({ action: action }, extra || {}))
+    });
+    return res.json();
+  }
+
+  function stravaBtn() { return document.getElementById("stravaBtn"); }
+  function setStravaUI(label, connected) {
+    const b = stravaBtn(); if (!b) return;
+    b.textContent = label;
+    b.classList.toggle("connected", !!connected);
+  }
+
+  function beginStravaConnect() {
+    if (!STRAVA_CLIENT_ID) {
+      alert("Strava isn't configured yet.\n\nAdd your Strava Client ID to STRAVA_CLIENT_ID in app.js, and set the secrets on the edge function. See STRAVA_SETUP.md.");
+      return;
+    }
+    const redirect = location.origin + location.pathname;
+    location.href = "https://www.strava.com/oauth/authorize"
+      + "?client_id=" + encodeURIComponent(STRAVA_CLIENT_ID)
+      + "&response_type=code&approval_prompt=auto"
+      + "&scope=" + encodeURIComponent(STRAVA_SCOPE)
+      + "&redirect_uri=" + encodeURIComponent(redirect);
+  }
+
+  // Match one activity to a planned session on the same day, and tick it.
+  function applyActivity(a) {
+    const type = STRAVA_TYPES[a.type];
+    if (!type) return false;
+    const iso = String(a.start_local || "").slice(0, 10);
+    if (!iso) return false;
+    if (state.strava.applied[a.id]) return false;          // already counted
+
+    const sessions = sessionsOfDay(iso);
+    for (let i = 0; i < sessions.length; i++) {
+      if (sessions[i].type !== type) continue;
+      const key = keyFor(iso, i);
+      if (state.done[key]) continue;                        // already ticked by hand
+      state.done[key] = true;
+      state.strava.applied[a.id] = key;
+      return true;
+    }
+    return false;
+  }
+
+  async function syncStrava(opts) {
+    const quiet = opts && opts.quiet;
+    try {
+      if (!quiet) setStravaUI("syncing…", true);
+      const r = await stravaCall("sync", {});
+      if (r.error) { if (!quiet) alert("Strava sync failed: " + r.error); setStravaUI("Strava", false); return; }
+      if (!r.connected) { setStravaUI("Connect Strava", false); return; }
+
+      let n = 0;
+      (r.activities || []).forEach(a => { if (applyActivity(a)) n++; });
+      if (n) { persist(); rerenderAll(); }
+      setStravaUI(n ? "✓ " + n + " synced" : "✓ Strava", true);
+      if (n) setTimeout(() => setStravaUI("✓ Strava", true), 4000);
+    } catch (e) {
+      if (!quiet) alert("Couldn't reach Strava sync.");
+      setStravaUI("Strava", false);
+    }
+  }
+
+  async function initStrava() {
+    const b = stravaBtn(); if (!b) return;
+
+    // Not set up yet — hide the control rather than showing one that fails.
+    // It appears automatically once STRAVA_CLIENT_ID is filled in (see STRAVA_SETUP.md).
+    if (!STRAVA_CLIENT_ID) { b.hidden = true; return; }
+
+    // Returning from Strava's consent screen?
+    const q = new URLSearchParams(location.search);
+    if (q.get("code") && q.get("scope")) {
+      setStravaUI("connecting…", true);
+      const r = await stravaCall("exchange", { code: q.get("code") });
+      history.replaceState({}, "", location.origin + location.pathname);   // drop the code from the URL
+      if (r.error) { alert("Strava connection failed: " + r.error); setStravaUI("Connect Strava", false); return; }
+      await syncStrava({});
+      return;
+    }
+
+    b.addEventListener("click", async () => {
+      if (!ensureEdit()) return;                            // same PIN gate as any other change
+      const st = await stravaCall("status", {}).catch(() => ({}));
+      if (st && st.connected) {
+        if (b.classList.contains("connected") && confirm("Sync now?\n\n(Cancel to disconnect Strava instead.)")) syncStrava({});
+        else if (confirm("Disconnect Strava?")) { await stravaCall("disconnect", {}); setStravaUI("Connect Strava", false); }
+      } else beginStravaConnect();
+    });
+
+    const st = await stravaCall("status", {}).catch(() => null);
+    if (st && st.connected) { setStravaUI("✓ Strava", true); syncStrava({ quiet: true }); }
+    else setStravaUI("Connect Strava", false);
+  }
 
   // ---------- PIN / edit lock ----------
   let editing = sessionStorage.getItem("htp_edit") === "1" || localStorage.getItem("htp_trust") === "1";
@@ -533,4 +650,5 @@
   fcSet(TP.parse(today));                 // seed the flip card so it's never blank
   renderCalendar(); renderUpNext(); recomputeStats();
   cloudInit();
+  initStrava();
 })();

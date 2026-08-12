@@ -197,6 +197,16 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .lock-btn:hover{border-color:var(--line-3);}
 .lock-btn.unlocked{background:var(--sage-s);border-color:transparent;color:var(--sage-d);}
 
+/* Strava connect / sync */
+.strava-btn{
+  background:var(--paper);border:1px solid var(--line-2);border-radius:100px;
+  padding:5px 13px;font-size:11.5px;font-weight:600;color:var(--ink-soft);
+  letter-spacing:-.005em;white-space:nowrap;box-shadow:var(--sh-1);transition:.2s var(--ease);
+}
+.strava-btn:hover{border-color:#FC4C02;color:#FC4C02;}
+.strava-btn.connected{background:#FC4C02;border-color:#FC4C02;color:#fff;}
+.strava-btn.connected:hover{background:#E44502;color:#fff;}
+
 /* ============================================================
    LAYOUT
    ============================================================ */
@@ -760,8 +770,11 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   .sync-pill{padding:6px;gap:0;}
   .sync-pill #syncText{display:none;}
   .lock-btn{font-size:11.5px;padding:5px 10px;}
+  .strava-btn{font-size:11px;padding:5px 10px;}
 }
-@media (max-width:380px){
+@media (max-width:420px){
+  /* the sync dot is the least important control once space runs out */
+  .sync-pill{display:none;}
   .lock-btn{font-size:0;padding:7px 9px;}
   .lock-btn::first-letter{font-size:13px;}
 }
