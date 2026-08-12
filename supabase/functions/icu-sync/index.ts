@@ -145,6 +145,10 @@ Deno.serve(async (req) => {
       if (numericId) {
         await probe("activities_numeric_id", `${ICU_BASE}/athlete/${numericId}/activities?oldest=2015-01-01&newest=2026-12-31`);
       }
+      // 5. wellness (sleep / HRV / steps) — Garmin syncs this separately from
+      //    activities, so data here with none above proves the link is alive
+      //    and the account simply has no recorded workouts.
+      await probe("wellness", `${ICU_BASE}/athlete/${ICU_ATHLETE_ID}/wellness?oldest=2026-08-01&newest=2026-08-12`);
 
       return json(out, 200, origin);
     }
