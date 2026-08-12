@@ -39,10 +39,19 @@ lives in Supabase secrets, which is why the edge function exists.
 ### 3. Deploy the function and set the secret
 
 ```bash
-supabase link --project-ref notibogaoeqakmeyxhar
-supabase functions deploy icu-sync
-supabase secrets set ICU_API_KEY=your_key_here
+supabase login
+supabase functions deploy icu-sync --project-ref notibogaoeqakmeyxhar --no-verify-jwt
+supabase secrets set ICU_API_KEY=your_key_here --project-ref notibogaoeqakmeyxhar
 ```
+
+`--no-verify-jwt` is required: this site authenticates with a **publishable** key,
+which is not a JWT. With JWT verification on, the platform rejects the call with 401
+before the function runs. The key is sent on the `apikey` header only — putting a
+publishable key on `Authorization: Bearer` causes the same 401.
+
+The trade-off is that the function is then publicly callable by anyone who knows its
+URL. It only ever returns a list of activities — the API key stays server-side and is
+never included in a response — so the exposure is her workout list, not credentials.
 
 No database migration is needed — there are no tokens to store, just the one key.
 

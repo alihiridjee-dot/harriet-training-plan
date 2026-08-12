@@ -82,7 +82,10 @@
   async function icuCall(action, extra) {
     const res = await fetch(ICU_FN, {
       method: "POST",
-      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY, "apikey": SB_KEY },
+      // The publishable key goes on `apikey` ONLY. It is not a JWT, so sending it
+      // as `Authorization: Bearer` makes the platform try to parse it as one and
+      // reject the call with 401 before the function runs.
+      headers: { "Content-Type": "application/json", "apikey": SB_KEY },
       body: JSON.stringify(Object.assign({ action: action }, extra || {}))
     });
     return res.json();
