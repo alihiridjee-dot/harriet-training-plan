@@ -18,7 +18,7 @@
   const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
   // ---------- state ----------
-  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {} }; }
+  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {}, imported: d.imported || {} }; }
   function loadLocal() { try { return normalize(JSON.parse(localStorage.getItem(LOCAL_KEY))); } catch (e) { return normalize(); } }
   function saveLocal() { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); }
   let state = loadLocal();
@@ -61,6 +61,88 @@
     } catch (e) { setSync("offline"); }
   }
   function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
+
+  // ---------- activity sync: Garmin → intervals.icu → here ----------
+  // Garmin's own API is business-only, so we read from intervals.icu, which
+  // syncs from Garmin automatically. The API key stays in the edge function —
+  // it grants full access to the intervals.icu account, so it never ships here.
+  // Flip this to true once the function is deployed (see ICU_SETUP.md).
+  const ICU_SYNC_ENABLED = false;
+  const ICU_FN = SB_URL + "/functions/v1/icu-sync";
+
+  // intervals.icu activity type → our session type. Unlisted types are ignored.
+  const ICU_TYPES = {
+    Run: "run", TrailRun: "run", VirtualRun: "run", Treadmill: "run",
+    Ride: "bike", VirtualRide: "bike", GravelRide: "bike", MountainBikeRide: "bike", EBikeRide: "bike",
+    Swim: "swim", OpenWaterSwim: "swim",
+    WeightTraining: "strength", Crossfit: "strength", Workout: "strength",
+    Yoga: "mobility", Walk: "mobility", Hike: "mobility", Elliptical: "mobility"
+  };
+
+  async function icuCall(action, extra) {
+    const res = await fetch(ICU_FN, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + SB_KEY, "apikey": SB_KEY },
+      body: JSON.stringify(Object.assign({ action: action }, extra || {}))
+    });
+    return res.json();
+  }
+
+  function setSyncBtn(label, ok) {
+    const b = document.getElementById("icuBtn"); if (!b) return;
+    b.textContent = label;
+    b.classList.toggle("connected", !!ok);
+  }
+
+  // Match one activity to a planned session on the same day, and tick it.
+  function applyActivity(a) {
+    const type = ICU_TYPES[a.type];
+    if (!type) return false;
+    const iso = String(a.start_local || "").slice(0, 10);
+    if (!iso) return false;
+    const tag = "icu:" + a.id;
+    if (state.imported[tag]) return false;            // already counted
+
+    const sessions = sessionsOfDay(iso);
+    for (let i = 0; i < sessions.length; i++) {
+      if (sessions[i].type !== type) continue;
+      const key = keyFor(iso, i);
+      if (state.done[key]) continue;                   // already ticked by hand
+      state.done[key] = true;
+      state.imported[tag] = key;
+      return true;
+    }
+    return false;
+  }
+
+  async function syncActivities(opts) {
+    const quiet = opts && opts.quiet;
+    try {
+      if (!quiet) setSyncBtn("syncing…", true);
+      const r = await icuCall("sync", {});
+      if (r.error) { if (!quiet) alert("Sync failed: " + r.error); setSyncBtn("Sync", false); return; }
+
+      let n = 0;
+      (r.activities || []).forEach(a => { if (applyActivity(a)) n++; });
+      if (n) { persist(); rerenderAll(); }
+      setSyncBtn(n ? "✓ " + n + " synced" : "✓ Synced", true);
+      if (n) setTimeout(() => setSyncBtn("✓ Synced", true), 4000);
+    } catch (e) {
+      if (!quiet) alert("Couldn't reach the sync service.");
+      setSyncBtn("Sync", false);
+    }
+  }
+
+  async function initActivitySync() {
+    const b = document.getElementById("icuBtn"); if (!b) return;
+    if (!ICU_SYNC_ENABLED) { b.hidden = true; return; }   // nothing deployed yet
+
+    b.addEventListener("click", () => { if (ensureEdit()) syncActivities({}); });
+
+    const st = await icuCall("status", {}).catch(() => null);
+    if (st && st.connected) { setSyncBtn("✓ Synced", true); syncActivities({ quiet: true }); }
+    else { setSyncBtn("Sync", false); }
+  }
 
   // ---------- PIN / edit lock ----------
   let editing = sessionStorage.getItem("htp_edit") === "1" || localStorage.getItem("htp_trust") === "1";
@@ -533,4 +615,5 @@
   fcSet(TP.parse(today));                 // seed the flip card so it's never blank
   renderCalendar(); renderUpNext(); recomputeStats();
   cloudInit();
+  initActivitySync();
 })();
