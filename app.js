@@ -959,6 +959,15 @@
   document.getElementById("pinScrim").addEventListener("click", e => { if (e.target.id === "pinScrim") closePin(); });
   document.getElementById("pinInput").addEventListener("keydown", e => { if (e.key === "Enter") tryPin(); });
 
+  // nav lifts off the page once you leave the top
+  (function navElevation() {
+    const nav = document.querySelector(".topnav");
+    if (!nav) return;
+    const onScroll = () => nav.classList.toggle("scrolled", window.scrollY > 4);
+    addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  })();
+
   (function legend() {
     const el = document.getElementById("legend");
     Object.keys(TP.TYPE_META).forEach(t => { const m = TP.TYPE_META[t]; el.innerHTML += '<span><span class="dot" style="background:' + m.color + '"></span>' + m.label + '</span>'; });
