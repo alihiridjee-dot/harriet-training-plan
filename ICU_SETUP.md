@@ -72,6 +72,25 @@ never shows a control that would fail.
 - It's behind the same PIN gate as any other change.
 - The default window is the last 45 days.
 
+## Readiness strip
+
+Garmin syncs **wellness** (sleep, HRV, resting HR, steps) on a separate permission
+from activities, and it arrives every day whether or not a workout was recorded. The
+readiness card above the calendar shows last night's numbers with each metric compared
+against a 28-day rolling baseline, plus a plain-English read:
+
+- **Primed** — sleep and HRV where they should be; good day for the hard session.
+- **Steady** — one signal off; start easy and reassess.
+- **Go easy** — two or more signals off; lighten the day or move the hard session.
+
+It's deliberately conservative: a metric only counts against her when there's actually
+data for it, and a missing night shows `—` rather than being treated as zero. The
+thresholds are HRV below 92% of baseline, resting HR more than 3bpm above it, or under
+6 hours' sleep.
+
+This works independently of activity sync — useful right now, since wellness is
+flowing but no activities are.
+
 ## How matching works
 
 | intervals.icu type | Session |

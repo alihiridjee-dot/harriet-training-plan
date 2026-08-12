@@ -112,6 +112,38 @@ Deno.serve(async (req) => {
       return json({ connected: true, activities }, 200, origin);
     }
 
+    // ---- wellness: sleep / HRV / resting HR for the readiness strip ----
+    // Garmin syncs this daily even on days with no recorded workout.
+    if (action === "wellness") {
+      const now = new Date();
+      const past = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
+      const oldest = String(body.oldest ?? ymd(past));
+      const newest = String(body.newest ?? ymd(now));
+
+      const res = await fetch(
+        `${ICU_BASE}/athlete/${ICU_ATHLETE_ID}/wellness?oldest=${encodeURIComponent(oldest)}&newest=${encodeURIComponent(newest)}`,
+        { headers: { Authorization: authHeader() } },
+      );
+      if (res.status === 429) return json({ error: "rate limited, try again shortly" }, 429, origin);
+      if (!res.ok) return json({ error: "intervals.icu error " + res.status }, 502, origin);
+
+      const raw = await res.json();
+      const days = (Array.isArray(raw) ? raw : [])
+        .map((d) => ({
+          date: d.id,
+          sleep_s: d.sleepSecs ?? null,
+          sleep_score: d.sleepScore ?? null,
+          hrv: d.hrv ?? null,
+          resting_hr: d.restingHR ?? null,
+          steps: d.steps ?? null,
+          readiness: d.readiness ?? null,
+        }))
+        // keep only days that carry at least one useful signal
+        .filter((d) => d.sleep_s !== null || d.hrv !== null || d.resting_hr !== null);
+
+      return json({ connected: true, days }, 200, origin);
+    }
+
     // ---- diagnostics: what is intervals.icu actually returning? ----
     // Never echoes the API key. Safe to call; read-only.
     if (action === "debug") {

@@ -136,6 +136,81 @@
     }
   }
 
+  // ---------- readiness strip (sleep / HRV / resting HR) ----------
+  // Wellness syncs from Garmin every day, including days with no workout, so
+  // this works even while there are no recorded activities to tick off.
+  function mean(xs) { return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null; }
+
+  function renderReadiness(days) {
+    const el = document.getElementById("readiness");
+    if (!el || !days || !days.length) return;
+
+    // newest day carrying any signal
+    const sorted = days.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+    const latest = sorted[sorted.length - 1];
+    if (!latest) return;
+
+    // baselines from the trailing window, excluding the day being judged
+    const prior = sorted.slice(0, -1).slice(-28);
+    const hrvBase = mean(prior.map(d => d.hrv).filter(v => typeof v === "number"));
+    const rhrBase = mean(prior.map(d => d.resting_hr).filter(v => typeof v === "number"));
+
+    const sleepH = latest.sleep_s ? latest.sleep_s / 3600 : null;
+    const hrv = typeof latest.hrv === "number" ? latest.hrv : null;
+    const rhr = typeof latest.resting_hr === "number" ? latest.resting_hr : null;
+
+    const set = (id, txt) => { const n = document.getElementById(id); if (n) n.textContent = txt; };
+    const delta = (v, base, invert) => {
+      if (v === null || base === null) return "";
+      const d = v - base, r = Math.round(d * 10) / 10;
+      const good = invert ? d <= 0 : d >= 0;
+      return (r > 0 ? "+" : "") + r + " vs avg" + (good ? " ✓" : "");
+    };
+
+    set("rdDate", latest.date === today ? "last night" : latest.date);
+    set("rdSleep", sleepH ? sleepH.toFixed(1) + "h" : "—");
+    set("rdSleepSub", latest.sleep_score ? "score " + latest.sleep_score : (sleepH ? "" : "not recorded"));
+    set("rdHrv", hrv !== null ? String(hrv) : "—");
+    set("rdHrvSub", delta(hrv, hrvBase, false));
+    set("rdRhr", rhr !== null ? String(rhr) : "—");
+    set("rdRhrSub", delta(rhr, rhrBase, true));
+    set("rdSteps", latest.steps ? latest.steps.toLocaleString() : "—");
+
+    // Simple, conservative read — flags only where we actually have a signal.
+    const flags = [];
+    if (sleepH !== null && sleepH < 6) flags.push("short sleep");
+    if (hrv !== null && hrvBase !== null && hrv < hrvBase * 0.92) flags.push("HRV below your baseline");
+    if (rhr !== null && rhrBase !== null && rhr > rhrBase + 3) flags.push("resting HR up");
+
+    const badge = document.getElementById("rdVerdict");
+    let verdict, cls, note;
+    if (flags.length >= 2) {
+      verdict = "Go easy"; cls = "rd-verdict low";
+      note = "Your body's asking for a lighter day — " + flags.join(" and ") + ". Keep today easy, or swap the hard session to tomorrow.";
+    } else if (flags.length === 1) {
+      verdict = "Steady"; cls = "rd-verdict mid";
+      note = "Mostly fine, but " + flags[0] + ". Start easy and see how the legs feel before pushing.";
+    } else if (hrv === null && sleepH === null) {
+      verdict = "No data"; cls = "rd-verdict mid";
+      note = "Nothing recorded overnight — worth checking the watch was worn.";
+    } else {
+      verdict = "Primed"; cls = "rd-verdict good";
+      note = "Sleep and HRV are where they should be. A good day to take on the hard session.";
+    }
+    if (badge) { badge.textContent = verdict; badge.className = cls; }
+    set("rdNote", note);
+
+    el.hidden = false;
+  }
+
+  async function loadReadiness() {
+    if (!ICU_SYNC_ENABLED) return;
+    try {
+      const r = await icuCall("wellness", {});
+      if (r && r.days && r.days.length) renderReadiness(r.days);
+    } catch (e) { /* readiness is a bonus — never block the app on it */ }
+  }
+
   async function initActivitySync() {
     const b = document.getElementById("icuBtn"); if (!b) return;
     if (!ICU_SYNC_ENABLED) { b.hidden = true; return; }   // nothing deployed yet
@@ -619,4 +694,5 @@
   renderCalendar(); renderUpNext(); recomputeStats();
   cloudInit();
   initActivitySync();
+  loadReadiness();
 })();

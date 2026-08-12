@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20">
+<link rel="stylesheet" href="styles.css?v=21">
 </head>
 <body>
 
@@ -69,6 +69,21 @@
         </header>
 
         <div class="coach-note" id="coachNote"></div>
+
+        <!-- readiness: sleep / HRV / resting HR, straight from her watch -->
+        <section class="readiness" id="readiness" hidden>
+          <div class="rd-head">
+            <span class="rd-kicker">Readiness · <span id="rdDate">–</span></span>
+            <span class="rd-verdict" id="rdVerdict">–</span>
+          </div>
+          <div class="rd-metrics">
+            <div class="rd-metric"><div class="rd-n" id="rdSleep">–</div><div class="rd-l">sleep</div><div class="rd-sub" id="rdSleepSub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdHrv">–</div><div class="rd-l">HRV</div><div class="rd-sub" id="rdHrvSub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdRhr">–</div><div class="rd-l">resting HR</div><div class="rd-sub" id="rdRhrSub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdSteps">–</div><div class="rd-l">steps</div><div class="rd-sub"></div></div>
+          </div>
+          <div class="rd-note" id="rdNote"></div>
+        </section>
 
         <!-- calendar card -->
         <section class="cal-card">
@@ -208,6 +223,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="data.js?v=8"></script>
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>
