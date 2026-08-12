@@ -2,7 +2,7 @@
    Harriet's Ironman Journey
    Editorial · luxurious · calendar-first — built by Ali ♡
    Design system: warm bone canvas, near-black ink, ember accent,
-   Fraunces display serif + Inter UI grotesque.
+   unified Apple typography (SF Pro Display / Text).
    ============================================================ */
 
 :root{
@@ -57,8 +57,10 @@
   --spring:cubic-bezier(.28,1.12,.36,1);
 
   /* --- type --- */
-  --f-display:"Fraunces", "Iowan Old Style", Georgia, "Times New Roman", serif;
-  --f-body:"Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+  /* Apple typography: SF Pro is the system face on Apple devices and carries the
+     whole UI. Inter is only a fallback for non-Apple platforms. */
+  --f-display:"SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Arial, sans-serif;
+  --f-body:-apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Inter", "Helvetica Neue", Arial, sans-serif;
 }
 
 *{box-sizing:border-box;}
@@ -123,7 +125,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   background:linear-gradient(90deg,transparent,var(--gold),transparent);
 }
 .splash-name{
-  font-family:var(--f-display);font-weight:400;font-size:30px;letter-spacing:-.015em;
+  font-family:var(--f-display);font-weight:600;font-size:29px;letter-spacing:-.03em;
   color:#EDEAE4;margin-top:18px;opacity:0;animation:fUp .8s var(--ease) forwards .72s;
 }
 .splash-sig{
@@ -206,11 +208,11 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .page-head{margin-bottom:38px;}
 .ph-kicker{font-size:10.5px;letter-spacing:.18em;color:var(--gold);}
 .ph-title{
-  font-family:var(--f-display);font-size:clamp(42px,6.4vw,64px);font-weight:400;
-  letter-spacing:-.028em;line-height:1.02;margin:16px 0 0;
+  font-family:var(--f-display);font-size:clamp(40px,6.2vw,62px);font-weight:700;
+  letter-spacing:-.035em;line-height:1.03;margin:16px 0 0;
 }
 .ph-sub{
-  font-family:var(--f-display);font-size:19px;font-weight:400;line-height:1.5;
+  font-size:20px;font-weight:400;line-height:1.45;letter-spacing:-.015em;
   color:var(--ink-soft);max-width:520px;margin:16px 0 0;
 }
 /* hairline divider beneath the masthead */
@@ -238,7 +240,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   font-size:11px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;
   color:var(--muted);margin-bottom:11px;
 }
-.goal-btn b{font-family:var(--f-display);font-weight:500;font-size:20px;letter-spacing:-.02em;line-height:1.15;}
+.goal-btn b{font-family:var(--f-display);font-weight:700;font-size:19px;letter-spacing:-.028em;line-height:1.2;}
 .goal-btn .g-date{color:var(--muted);font-size:12px;font-weight:500;margin-top:7px;letter-spacing:.005em;}
 .goal-btn:hover{transform:translateY(-3px);box-shadow:var(--sh-2);border-color:var(--line-2);}
 .goal-btn.active{box-shadow:0 0 0 1.5px var(--iron),var(--sh-2);}
@@ -273,7 +275,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   padding:28px 28px 22px;box-shadow:var(--sh-1);margin-bottom:26px;scroll-margin-top:74px;
 }
 .cal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:22px;flex-wrap:wrap;}
-.cal-head h2{font-family:var(--f-display);font-size:30px;font-weight:400;letter-spacing:-.025em;}
+.cal-head h2{font-family:var(--f-display);font-size:29px;font-weight:700;letter-spacing:-.032em;}
 .cal-sub{font-size:12px;color:var(--muted);font-weight:500;margin-top:5px;letter-spacing:.005em;}
 .cal-sub #stat-race{color:var(--iron);font-weight:700;}
 .cal-nav{display:flex;gap:6px;align-items:center;}
@@ -309,8 +311,8 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .cell.empty:hover{transform:none;box-shadow:none;}
 
 .cell .dnum{
-  font-family:var(--f-display);font-size:17px;font-weight:500;color:var(--ink);
-  line-height:1;letter-spacing:-.02em;
+  font-family:var(--f-display);font-size:16px;font-weight:600;color:var(--ink);
+  line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums;
 }
 
 /* phase indicator — a refined hairline, not a slab */
@@ -395,7 +397,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   background:#E8E1D2;border-radius:0 0 12px 12px;z-index:-1;
 }
 .fc-weekday{font-size:10.5px;font-weight:700;letter-spacing:.2em;color:var(--muted);text-transform:uppercase;}
-.fc-day{font-family:var(--f-display);font-weight:400;font-size:80px;line-height:1;color:var(--ink);letter-spacing:-.045em;margin:12px 0 8px;}
+.fc-day{font-family:var(--f-display);font-weight:700;font-size:78px;line-height:1;color:var(--ink);letter-spacing:-.05em;margin:12px 0 8px;font-variant-numeric:tabular-nums;}
 .fc-month{font-size:13px;font-weight:700;letter-spacing:.18em;color:var(--ink-soft);text-transform:uppercase;}
 .fc-year{font-size:12px;font-weight:500;color:var(--muted);margin-top:9px;letter-spacing:.06em;}
 .fc-page.land{animation:fcLand .65s var(--spring);}
@@ -413,7 +415,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .ins-stat{flex:1;text-align:center;}
 .ins-stat:first-child{text-align:left;}
 .ins-stat .n{
-  font-family:var(--f-display);font-size:38px;font-weight:400;letter-spacing:-.03em;line-height:1;
+  font-family:var(--f-display);font-size:36px;font-weight:700;letter-spacing:-.035em;line-height:1;
   font-variant-numeric:tabular-nums;
 }
 .ins-stat:nth-child(1) .n{color:var(--blue-d);}
@@ -479,7 +481,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
    BLOCKS
    ============================================================ */
 .blocks-intro{margin-bottom:32px;max-width:660px;}
-.blocks-intro h2{font-family:var(--f-display);font-size:clamp(32px,4.6vw,44px);font-weight:400;letter-spacing:-.028em;margin-bottom:14px;}
+.blocks-intro h2{font-family:var(--f-display);font-size:clamp(31px,4.5vw,43px);font-weight:700;letter-spacing:-.035em;margin-bottom:14px;}
 .blocks-intro p{color:var(--ink-soft);font-size:16px;margin:0;line-height:1.65;}
 .blocks-intro b{color:var(--ink);font-weight:600;}
 
@@ -497,7 +499,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .block.tint-taper{--bl:var(--clay-d);}
 .block-top{display:flex;align-items:baseline;gap:13px;flex-wrap:wrap;}
 .block-n{font-size:10px;letter-spacing:.15em;color:var(--gold);}
-.block h3{font-family:var(--f-display);font-size:25px;font-weight:400;letter-spacing:-.025em;}
+.block h3{font-family:var(--f-display);font-size:23px;font-weight:700;letter-spacing:-.03em;}
 .block-now{
   font-size:9.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
   color:#fff;background:var(--iron);padding:4px 10px;border-radius:100px;
@@ -521,14 +523,14 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   width:80px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);
 }
 .ali-quote{
-  font-family:var(--f-display);font-weight:400;font-size:26px;line-height:1.45;
-  letter-spacing:-.02em;color:var(--clay-d);max-width:540px;margin:0 auto;
+  font-family:var(--f-display);font-weight:600;font-size:24px;line-height:1.42;
+  letter-spacing:-.03em;color:var(--clay-d);max-width:540px;margin:0 auto;
 }
 .ali-sign{font-size:11px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:var(--iron);margin-top:20px;}
 
 /* footer */
 .site-foot{margin-top:64px;padding-top:32px;border-top:1px solid var(--line);text-align:center;}
-.foot{font-family:var(--f-display);font-weight:400;font-size:19px;color:var(--iron);margin:0 0 7px;letter-spacing:-.015em;}
+.foot{font-family:var(--f-display);font-weight:600;font-size:18px;color:var(--iron);margin:0 0 7px;letter-spacing:-.025em;}
 .foot-mini{font-size:11.5px;color:var(--muted);font-weight:450;margin:0;letter-spacing:.01em;}
 
 /* ============================================================
@@ -570,7 +572,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 }
 .dclose:hover{background:rgba(255,255,255,.26);transform:rotate(90deg);}
 .dphase{font-size:10px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.62);}
-.drawer-head h3{font-family:var(--f-display);color:#fff;font-size:32px;font-weight:400;margin:10px 0 3px;letter-spacing:-.025em;}
+.drawer-head h3{font-family:var(--f-display);color:#fff;font-size:30px;font-weight:700;margin:10px 0 3px;letter-spacing:-.033em;}
 .ddate{font-size:13px;color:rgba(255,255,255,.7);font-weight:450;}
 .devent{
   display:inline-block;margin-top:13px;background:rgba(255,255,255,.14);
@@ -589,7 +591,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .swap-picker .sp-label{font-size:10.5px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.66);margin-bottom:11px;}
 .mini-grid{background:rgba(255,255,255,.97);border-radius:13px;padding:13px;box-shadow:0 8px 22px -8px rgba(0,0,0,.4);}
 .mg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px;}
-.mg-title{font-family:var(--f-display);font-weight:500;font-size:15px;color:var(--ink);letter-spacing:-.02em;}
+.mg-title{font-family:var(--f-display);font-weight:700;font-size:14.5px;color:var(--ink);letter-spacing:-.028em;}
 .mg-nav{
   width:27px;height:27px;border:1px solid var(--line);border-radius:9px;background:var(--bg);
   color:var(--ink);font-size:14px;font-weight:600;line-height:1;transition:.18s var(--ease);
@@ -660,7 +662,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   background:rgba(244,241,235,.8);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
 }
 .agenda-nav{display:flex;align-items:center;gap:14px;}
-.agenda-nav h2{font-family:var(--f-display);font-size:23px;font-weight:400;min-width:160px;text-align:center;letter-spacing:-.025em;}
+.agenda-nav h2{font-family:var(--f-display);font-size:22px;font-weight:700;min-width:160px;text-align:center;letter-spacing:-.032em;}
 .agenda-body{overflow-y:auto;flex:1;padding:24px 26px 70px;max-width:860px;margin:0 auto;width:100%;}
 .ag-day{
   position:relative;overflow:hidden;
@@ -674,7 +676,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
 .ag-day.is-today{--at:var(--iron);box-shadow:0 0 0 1px var(--iron),var(--sh-1);}
 .ag-day.done{background:var(--sage-s);}
 .ag-date{display:flex;align-items:baseline;gap:11px;margin-bottom:13px;}
-.ag-date b{font-family:var(--f-display);font-size:19px;font-weight:500;letter-spacing:-.02em;}
+.ag-date b{font-family:var(--f-display);font-size:18px;font-weight:700;letter-spacing:-.028em;}
 .ag-date span{font-size:12px;color:var(--muted);font-weight:450;}
 .ag-date .ag-ev{
   margin-left:auto;font-size:9.5px;font-weight:700;color:#fff;background:var(--iron);
@@ -704,7 +706,7 @@ button{font-family:inherit;cursor:pointer;color:inherit;}
   animation:modalIn .4s var(--spring) both;
 }
 @keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.97);}to{opacity:1;transform:none;}}
-.modal h3{font-family:var(--f-display);font-size:26px;font-weight:400;margin-bottom:9px;letter-spacing:-.025em;}
+.modal h3{font-family:var(--f-display);font-size:24px;font-weight:700;margin-bottom:9px;letter-spacing:-.032em;}
 .modal p{font-size:13.5px;color:var(--ink-soft);margin:0 0 20px;line-height:1.6;}
 #pinInput{
   width:100%;text-align:center;font-size:27px;letter-spacing:.45em;padding:14px;
