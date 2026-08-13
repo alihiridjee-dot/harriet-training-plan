@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=21">
+<link rel="stylesheet" href="styles.css?v=22">
 </head>
 <body>
 
@@ -145,6 +145,40 @@
           </div>
         </section>
 
+        <!-- week review: completion, what was missed, and a place to reflect -->
+        <section class="review" id="review">
+          <div class="rv-head">
+            <div>
+              <div class="rv-kicker">Week review</div>
+              <div class="rv-range" id="rvRange">–</div>
+            </div>
+            <div class="rv-nav">
+              <button class="rv-arrow" id="rvPrev" aria-label="Previous week">‹</button>
+              <button class="rv-arrow" id="rvNext" aria-label="Next week">›</button>
+            </div>
+          </div>
+
+          <div class="rv-top">
+            <div class="rv-count"><b id="rvCount">0/0</b><span id="rvPct">0%</span></div>
+            <div class="rv-verdict" id="rvVerdict">–</div>
+          </div>
+          <div class="rv-bar" id="rvBar"></div>
+          <div class="rv-key">
+            <span><i class="rv-dot done"></i> completed</span>
+            <span><i class="rv-dot missed"></i> missed</span>
+            <span><i class="rv-dot upcoming"></i> still to come</span>
+          </div>
+
+          <div class="rv-missed" id="rvMissed" hidden></div>
+
+          <div class="rv-feedback" id="rvFeedback">
+            <div class="rv-fb-label" id="rvFbLabel">How did the week go?</div>
+            <div class="rv-chips" id="rvChips"></div>
+            <textarea id="rvNote" rows="3" placeholder="Anything worth remembering — how the legs felt, what got in the way, what you'd change…"></textarea>
+            <div class="rv-saved" id="rvSaved"></div>
+          </div>
+        </section>
+
         <!-- up next -->
         <section class="upnext" id="upnext">
           <div class="upnext-head"><span class="upnext-kicker">Up next · from today</span></div>
@@ -223,6 +257,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="data.js?v=8"></script>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>

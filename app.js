@@ -18,7 +18,7 @@
   const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
   // ---------- state ----------
-  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {}, imported: d.imported || {} }; }
+  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {}, imported: d.imported || {}, reviews: d.reviews || {} }; }
   function loadLocal() { try { return normalize(JSON.parse(localStorage.getItem(LOCAL_KEY))); } catch (e) { return normalize(); } }
   function saveLocal() { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); }
   let state = loadLocal();
@@ -35,14 +35,23 @@
     document.getElementById("syncText").textContent = label || ({ live: "synced", saving: "saving…", offline: "offline" }[s] || s);
   }
   let saveTimer = null;
+  // Guards against our own realtime echo clobbering newer local edits: a write
+  // started before you finished typing would otherwise come back and overwrite
+  // whatever you typed in the meantime.
+  let lastSentJson = null, lastEditAt = 0;
+  const ECHO_QUIET_MS = 3000;
+
   function persist() {
     saveLocal();
+    lastEditAt = Date.now();
     if (!sb) return;
     setSync("saving");
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
+      const snapshot = JSON.stringify(state);
       try {
         const { error } = await sb.from("athlete_state").upsert({ id: ATHLETE_ID, data: state, updated_at: new Date().toISOString() });
+        if (!error) lastSentJson = snapshot;
         setSync(error ? "offline" : "live");
       } catch (e) { setSync("offline"); }
     }, 500);
@@ -56,11 +65,17 @@
       setSync(error ? "offline" : "live");
       sb.channel("athlete").on("postgres_changes",
         { event: "*", schema: "public", table: "athlete_state", filter: "id=eq." + ATHLETE_ID },
-        payload => { if (payload.new && payload.new.data) { state = normalize(payload.new.data); saveLocal(); rerenderAll(); } }
+        payload => {
+          if (!payload.new || !payload.new.data) return;
+          const incoming = JSON.stringify(payload.new.data);
+          if (incoming === lastSentJson) return;                     // our own write coming back
+          if (Date.now() - lastEditAt < ECHO_QUIET_MS) return;       // mid-edit — don't stomp it
+          state = normalize(payload.new.data); saveLocal(); rerenderAll();
+        }
       ).subscribe();
     } catch (e) { setSync("offline"); }
   }
-  function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
+  function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); renderReview(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
 
   // ---------- activity sync: Garmin → intervals.icu → here ----------
   // Garmin's own API is business-only, so we read from intervals.icu, which
@@ -134,6 +149,118 @@
       if (!quiet) alert("Couldn't reach the sync service.");
       setSyncBtn("Sync", false);
     }
+  }
+
+  // ---------- week review ----------
+  // Completion is only half the story: this also names what was missed and gives
+  // her somewhere to say why, which is the bit that's actually useful later.
+  const RV_REASONS = ["Too tired", "Illness", "No time", "Work", "Travel", "Weather", "Injury niggle", "Chose to rest"];
+  let rvMonday = null;   // Monday of the week being reviewed
+
+  // Every real session in a week, tagged done / missed / upcoming.
+  function weekSessions(monday) {
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = TP.addDays(monday, i);
+      sessionsOfDay(d).forEach((s, idx) => {
+        if (s.type === "rest") return;
+        const done = !!state.done[keyFor(d, idx)];
+        out.push({ iso: d, idx: idx, s: s, status: done ? "done" : (d < today ? "missed" : "upcoming") });
+      });
+    }
+    return out;
+  }
+
+  function rvRangeLabel(monday) {
+    const a = TP.parse(monday), b = TP.parse(TP.addDays(monday, 6));
+    const sameMonth = a.getMonth() === b.getMonth();
+    return a.getDate() + (sameMonth ? "" : " " + MON_ABBR[a.getMonth()]) + " – " +
+      b.getDate() + " " + MON_ABBR[b.getMonth()] + " " + b.getFullYear();
+  }
+
+  function saveReview(patch) {
+    const cur = state.reviews[rvMonday] || { reasons: [], note: "" };
+    state.reviews[rvMonday] = Object.assign({}, cur, patch);
+    persist();
+    const tag = document.getElementById("rvSaved");
+    if (tag) { tag.textContent = "saved ✓"; clearTimeout(tag._t); tag._t = setTimeout(() => { tag.textContent = ""; }, 2000); }
+  }
+
+  let rvNoteTimer = null;
+  function renderReview() {
+    const el = document.getElementById("review");
+    if (!el) return;
+    if (!rvMonday) rvMonday = mondayOf(today < TP.PLAN_START ? TP.PLAN_START : today);
+
+    const items = weekSessions(rvMonday);
+    const done = items.filter(x => x.status === "done").length;
+    const missed = items.filter(x => x.status === "missed");
+    const total = items.length;
+    const pct = total ? Math.round(done / total * 100) : 0;
+
+    document.getElementById("rvRange").textContent = rvRangeLabel(rvMonday);
+    document.getElementById("rvCount").textContent = done + "/" + total;
+    document.getElementById("rvPct").textContent = pct + "%";
+
+    // next arrow stops at the current week
+    document.getElementById("rvNext").disabled = rvMonday >= mondayOf(today);
+
+    // segmented bar — one block per session, so the shape of the week is visible
+    document.getElementById("rvBar").innerHTML = total
+      ? items.map(x => '<i class="rv-seg ' + x.status + '" title="' +
+          DOW[TP.weekdayMon0(x.iso)] + " · " + x.s.title.replace(/"/g, "") + ' (' + x.status + ')"></i>').join("")
+      : '<i class="rv-seg upcoming"></i>';
+
+    // verdict
+    const vd = document.getElementById("rvVerdict");
+    const settled = missed.length === 0 && items.every(x => x.status !== "upcoming");
+    if (!total) { vd.textContent = "no sessions"; vd.className = "rv-verdict"; }
+    else if (settled) { vd.textContent = "✓ Perfect week"; vd.className = "rv-verdict good"; }
+    else if (missed.length === 0) { vd.textContent = "On track"; vd.className = "rv-verdict good"; }
+    else if (missed.length <= 2) { vd.textContent = missed.length + " missed"; vd.className = "rv-verdict mid"; }
+    else { vd.textContent = missed.length + " missed"; vd.className = "rv-verdict low"; }
+
+    // what was actually missed
+    const mw = document.getElementById("rvMissed");
+    if (missed.length) {
+      mw.innerHTML = '<div class="rv-missed-title">Missed this week</div>' +
+        missed.map(x => {
+          const mm = meta(x.s.type), dt = TP.parse(x.iso);
+          return '<button class="rv-miss" data-iso="' + x.iso + '">' +
+            '<i class="rv-miss-dot" style="background:' + mm.color + '"></i>' +
+            '<span class="rv-miss-day">' + DOW[TP.weekdayMon0(x.iso)] + " " + dt.getDate() + " " + MON_ABBR[dt.getMonth()] + '</span>' +
+            '<span class="rv-miss-name">' + shortTitle(x.s.title) + '</span></button>';
+        }).join("") +
+        '<div class="rv-missed-note">Missing a session is normal — the plan is built to absorb it. Tap one to open that day.</div>';
+      mw.hidden = false;
+      mw.querySelectorAll(".rv-miss").forEach(b =>
+        b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
+    } else { mw.hidden = true; mw.innerHTML = ""; }
+
+    // reflective feedback
+    const saved = state.reviews[rvMonday] || { reasons: [], note: "" };
+    document.getElementById("rvFbLabel").textContent = missed.length
+      ? "What got in the way?" : "How did the week go?";
+    document.getElementById("rvChips").innerHTML = RV_REASONS.map(r =>
+      '<button class="rv-chip' + (saved.reasons.indexOf(r) > -1 ? " on" : "") + '" data-r="' + r + '">' + r + '</button>').join("");
+    document.getElementById("rvChips").querySelectorAll(".rv-chip").forEach(b =>
+      b.addEventListener("click", () => {
+        if (!ensureEdit()) return;
+        const r = b.getAttribute("data-r");
+        const cur = (state.reviews[rvMonday] || { reasons: [] }).reasons.slice();
+        const i = cur.indexOf(r);
+        if (i > -1) cur.splice(i, 1); else cur.push(r);
+        saveReview({ reasons: cur });
+        b.classList.toggle("on");
+      }));
+
+    const ta = document.getElementById("rvNote");
+    if (document.activeElement !== ta) ta.value = saved.note || "";
+    ta.oninput = () => {
+      if (!editing) { ta.value = saved.note || ""; ensureEdit(); return; }
+      clearTimeout(rvNoteTimer);
+      rvNoteTimer = setTimeout(() => saveReview({ note: ta.value }), 600);
+    };
   }
 
   // ---------- readiness strip (sleep / HRV / resting HR) ----------
@@ -672,6 +799,12 @@
     if (editing) { editing = false; sessionStorage.removeItem("htp_edit"); setLockUI(); if (currentIso && drawer.classList.contains("open")) openDrawer(currentIso); }
     else openPin();
   });
+  document.getElementById("rvPrev").addEventListener("click", () => { rvMonday = TP.addDays(rvMonday, -7); renderReview(); });
+  document.getElementById("rvNext").addEventListener("click", () => {
+    if (rvMonday >= mondayOf(today)) return;
+    rvMonday = TP.addDays(rvMonday, 7); renderReview();
+  });
+
   document.getElementById("pinOk").addEventListener("click", tryPin);
   document.getElementById("pinCancel").addEventListener("click", closePin);
   document.getElementById("pinScrim").addEventListener("click", e => { if (e.target.id === "pinScrim") closePin(); });
@@ -691,7 +824,7 @@
 
   setLockUI();
   fcSet(TP.parse(today));                 // seed the flip card so it's never blank
-  renderCalendar(); renderUpNext(); recomputeStats();
+  renderCalendar(); renderUpNext(); recomputeStats(); renderReview();
   cloudInit();
   initActivitySync();
   loadReadiness();
