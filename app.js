@@ -75,7 +75,7 @@
       ).subscribe();
     } catch (e) { setSync("offline"); }
   }
-  function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); renderReview(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
+  function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); renderReview(); renderToday(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
 
   // ---------- activity sync: Garmin → intervals.icu → here ----------
   // Garmin's own API is business-only, so we read from intervals.icu, which
@@ -149,6 +149,148 @@
       if (!quiet) alert("Couldn't reach the sync service.");
       setSyncBtn("Sync", false);
     }
+  }
+
+  // ---------- TODAY view ----------
+  const ICONS = { run: "🏃‍♀️", bike: "🚴‍♀️", swim: "🏊‍♀️", strength: "💪", mobility: "🧘‍♀️", rest: "🌙", race: "🏁" };
+
+  function nextRaceInfo() {
+    const races = [[TP.SPRINT_TRI, "Sprint Triathlon"], [TP.IPSWICH_HALF, "Ipswich Half"], [TP.RACE_703, "Ironman 70.3"]];
+    let prev = TP.PLAN_START;
+    for (let i = 0; i < races.length; i++) {
+      if (races[i][0] >= today) return { iso: races[i][0], name: races[i][1], from: prev };
+      prev = races[i][0];
+    }
+    return null;
+  }
+
+  function renderHero() {
+    const day = dayOf(today), dt = TP.parse(today);
+    const phase = day.phase.label + (day.weekNum ? " · Week " + day.weekNum : "");
+    document.getElementById("heroPhase").textContent = phase;
+    document.getElementById("heroDay").textContent = day.dayName;
+    document.getElementById("heroDate").textContent = dt.getDate() + " " + MONTHS[dt.getMonth()] + " " + dt.getFullYear();
+
+    // tint the hero to the day's dominant discipline
+    const real = sessionsOfDay(today).filter(s => s.type !== "rest");
+    const lead = real.length ? real[0].type : "rest";
+    document.getElementById("hero").setAttribute("data-lead", lead);
+
+    const r = nextRaceInfo();
+    const ring = document.getElementById("hcFill");
+    const C = 2 * Math.PI * 52;
+    if (r) {
+      const left = TP.daysBetween(today, r.iso);
+      const span = Math.max(1, TP.daysBetween(r.from, r.iso));
+      const gone = Math.min(1, Math.max(0, TP.daysBetween(r.from, today) / span));
+      document.getElementById("heroCountdown").textContent = left;
+      document.getElementById("heroCountLabel").textContent = "days to " + r.name;
+      document.getElementById("heroCountSub").textContent = Math.round(gone * 100) + "% of the way there";
+      ring.style.strokeDasharray = C;
+      ring.style.strokeDashoffset = C * (1 - gone);
+    } else {
+      document.getElementById("heroCountdown").textContent = "🎉";
+      document.getElementById("heroCountLabel").textContent = "season complete";
+      document.getElementById("heroCountSub").textContent = "";
+      ring.style.strokeDasharray = C; ring.style.strokeDashoffset = 0;
+    }
+  }
+
+  function renderTodaySessions() {
+    const wrap = document.getElementById("todaySessions");
+    const sessions = sessionsOfDay(today);
+    const real = sessions.filter(s => s.type !== "rest");
+    const doneCount = sessions.filter((s, i) => s.type !== "rest" && state.done[keyFor(today, i)]).length;
+
+    document.getElementById("todayMeta").textContent = real.length
+      ? doneCount + " of " + real.length + " done"
+      : "";
+
+    if (!sessions.length) {
+      wrap.innerHTML = '<div class="tcard t-rest"><div class="tc-top"><div class="tc-badge">🌙</div>' +
+        '<div class="tc-meta"><div class="tc-type">Off plan</div><h3>Nothing scheduled</h3>' +
+        '<div class="tc-sub">The plan runs 27 Jul 2026 → 9 May 2027.</div></div></div></div>';
+      return;
+    }
+
+    wrap.innerHTML = sessions.map((s, idx) => {
+      const mm = meta(s.type), isRest = s.type === "rest";
+      const done = !!state.done[keyFor(today, idx)];
+      const blocks = (s.blocks || []).slice(0, 3).map(b =>
+        '<div class="tc-block"><span class="tcb-l">' + b.label + '</span><span class="tcb-t">' + b.text + '</span></div>').join("");
+      return '<article class="tcard' + (done ? " done" : "") + (isRest ? " t-rest" : "") + '" data-idx="' + idx + '" style="--acc:' + mm.color + '">' +
+        '<div class="tc-glow"></div>' +
+        '<div class="tc-top">' +
+          '<div class="tc-badge">' + (ICONS[s.type] || "•") + '</div>' +
+          '<div class="tc-meta">' +
+            '<div class="tc-type">' + mm.label + (done ? ' · <b>done</b>' : '') + '</div>' +
+            '<h3>' + s.title + '</h3>' +
+            (s.sub ? '<div class="tc-sub">' + s.sub + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        (blocks ? '<div class="tc-blocks">' + blocks + '</div>' : '') +
+        '<div class="tc-actions">' +
+          (isRest ? '' : '<button class="tc-tick' + (done ? " on" : "") + '" data-idx="' + idx + '">' + (done ? "✓ Completed" : "Mark complete") + '</button>') +
+          '<button class="tc-more" data-iso="' + today + '">Full workout →</button>' +
+        '</div>' +
+      '</article>';
+    }).join("");
+
+    wrap.querySelectorAll(".tc-tick").forEach(b => b.addEventListener("click", e => {
+      e.stopPropagation();
+      if (!ensureEdit()) return;
+      const i = Number(b.getAttribute("data-idx"));
+      toggleDone(today, i, !state.done[keyFor(today, i)]);
+      renderTodaySessions(); renderRhythm(); renderReview(); recomputeStats(); renderCalendar();
+    }));
+    wrap.querySelectorAll(".tc-more").forEach(b => b.addEventListener("click", () => openDrawer(today)));
+  }
+
+  function renderRhythm() {
+    const el = document.getElementById("rhythm");
+    const monday = mondayOf(today < TP.PLAN_START ? TP.PLAN_START : today);
+    let done = 0, total = 0;
+    let html = "";
+    for (let i = 0; i < 7; i++) {
+      const d = TP.addDays(monday, i), dt = TP.parse(d);
+      const ss = sessionsOfDay(d), real = ss.filter(x => x.type !== "rest");
+      const dn = ss.filter((x, j) => x.type !== "rest" && state.done[keyFor(d, j)]).length;
+      done += dn; total += real.length;
+      const isToday = d === today;
+      const state_ = !real.length ? "rest" : (dn === real.length ? "done" : (d < today ? "missed" : "todo"));
+      const dots = real.length
+        ? real.slice(0, 3).map(x => '<i style="background:' + meta(x.type).color + '"></i>').join("")
+        : '<i class="rest-dot"></i>';
+      html += '<button class="rh-day ' + state_ + (isToday ? " is-today" : "") + '" data-iso="' + d + '">' +
+        '<span class="rh-dow">' + DOW[i] + '</span>' +
+        '<span class="rh-num">' + dt.getDate() + '</span>' +
+        '<span class="rh-dots">' + dots + '</span>' +
+      '</button>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll(".rh-day").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
+    document.getElementById("rhythmLabel").textContent = total ? done + "/" + total + " sessions" : "";
+  }
+
+  function renderToday() { renderHero(); renderTodaySessions(); renderRhythm(); }
+
+  // ---------- scroll reveal ----------
+  function initMotion() {
+    if (!("IntersectionObserver" in window)) {
+      document.querySelectorAll(".reveal").forEach(n => n.classList.add("in"));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    document.querySelectorAll(".reveal").forEach(n => io.observe(n));
+  }
+  function armReveals() {
+    // re-observe anything added or revealed after a view switch
+    document.querySelectorAll(".reveal:not(.in)").forEach(n => {
+      const r = n.getBoundingClientRect();
+      if (r.top < innerHeight * 0.95) n.classList.add("in");
+    });
   }
 
   // ---------- week review ----------
@@ -766,10 +908,13 @@
     document.querySelectorAll(".seg").forEach(s => s.classList.remove("active"));
     seg.classList.add("active");
     const v = seg.getAttribute("data-view");
+    document.getElementById("view-today").hidden = v !== "today";
     document.getElementById("view-calendar").hidden = v !== "calendar";
     document.getElementById("view-blocks").hidden = v !== "blocks";
     if (v === "blocks") renderBlocks();
+    if (v === "today") renderToday();
     window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(armReveals, 60);
   }));
   document.querySelectorAll(".goal-btn").forEach(b => b.addEventListener("click", () => setFocus(b.getAttribute("data-race"))));
   document.getElementById("focusClear").addEventListener("click", () => setFocus(focusRace));
@@ -799,6 +944,10 @@
     if (editing) { editing = false; sessionStorage.removeItem("htp_edit"); setLockUI(); if (currentIso && drawer.classList.contains("open")) openDrawer(currentIso); }
     else openPin();
   });
+  document.getElementById("heroScroll").addEventListener("click", () => {
+    document.getElementById("todaySec").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
   document.getElementById("rvPrev").addEventListener("click", () => { rvMonday = TP.addDays(rvMonday, -7); renderReview(); });
   document.getElementById("rvNext").addEventListener("click", () => {
     if (rvMonday >= mondayOf(today)) return;
@@ -818,13 +967,14 @@
   // ---------- splash + init ----------
   (function splash() {
     const el = document.getElementById("splash"), app = document.getElementById("app");
-    const reveal = () => { if (app.classList.contains("show")) return; el.classList.add("hidden"); app.classList.add("show"); setTimeout(armCalendarFlip, 340); };
+    const reveal = () => { if (app.classList.contains("show")) return; el.classList.add("hidden"); app.classList.add("show"); setTimeout(armReveals, 380); };
     document.getElementById("splashSkip").addEventListener("click", reveal);   // user actively enters
   })();
 
   setLockUI();
   fcSet(TP.parse(today));                 // seed the flip card so it's never blank
-  renderCalendar(); renderUpNext(); recomputeStats(); renderReview();
+  renderCalendar(); renderUpNext(); recomputeStats(); renderReview(); renderToday();
+  initMotion();
   cloudInit();
   initActivitySync();
   loadReadiness();
