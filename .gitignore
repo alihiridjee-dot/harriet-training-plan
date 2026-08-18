@@ -1,5 +1,2 @@
+supabase/.temp/
 .DS_Store
-Thumbs.db
-node_modules/
-*.log
-.vscode/
