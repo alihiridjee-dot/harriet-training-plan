@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;450;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=10">
+<link rel="stylesheet" href="styles.css?v=30">
 </head>
 <body>
 
@@ -38,27 +38,137 @@
           <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
             <circle cx="150" cy="66" r="55"/><path d="M95,150 L205,150 L205,300 L173,300 L161,226 L150,259 L139,226 L127,300 L95,300 Z"/>
           </svg>
-          <span>Harriet's Season</span>
+          <span>Harriet</span>
         </div>
         <div class="segmented" role="tablist">
-          <button class="seg active" data-view="calendar" role="tab">Calendar</button>
-          <button class="seg" data-view="blocks" role="tab">Blocks</button>
+          <button class="seg active" data-view="today" role="tab">Today</button>
+          <button class="seg" data-view="calendar" role="tab">Plan</button>
+          <button class="seg" data-view="blocks" role="tab">Journey</button>
         </div>
         <div class="tools">
           <span class="sync-pill" id="syncPill" title="Sync status"><i class="dot"></i><span id="syncText">connecting…</span></span>
+          <button class="icu-btn" id="icuBtn" title="Pull completed activities (Garmin syncs via intervals.icu)">Sync</button>
           <button class="lock-btn" id="editLock" title="Edit access">🔒</button>
         </div>
       </div>
     </nav>
 
-    <main class="wrap">
+    <!-- ===================== TODAY ===================== -->
+    <section id="view-today">
 
-      <!-- ===== CALENDAR VIEW ===== -->
-      <section id="view-calendar">
+      <!-- cinematic hero -->
+      <header class="hero" id="hero">
+        <div class="hero-bg" id="heroBg"></div>
+        <div class="hero-grain"></div>
+        <div class="hero-inner">
+          <div class="hero-kicker" id="heroPhase">—</div>
+          <h1 class="hero-day" id="heroDay">—</h1>
+          <div class="hero-date" id="heroDate">—</div>
 
-        <header class="page-head">
+          <div class="hero-count">
+            <div class="hc-ring" id="hcRing">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <circle class="hc-track" cx="60" cy="60" r="52"/>
+                <circle class="hc-fill" id="hcFill" cx="60" cy="60" r="52"/>
+              </svg>
+              <div class="hc-mid"><span class="hc-n" id="heroCountdown">–</span><span class="hc-u">days</span></div>
+            </div>
+            <div class="hc-side">
+              <div class="hc-label" id="heroCountLabel">to your next race</div>
+              <div class="hc-sub" id="heroCountSub"></div>
+            </div>
+          </div>
+        </div>
+        <button class="hero-scroll" id="heroScroll" aria-label="Scroll to today's session"><span></span></button>
+      </header>
+
+      <div class="wrap">
+
+        <!-- today's sessions -->
+        <section class="sec reveal" id="todaySec">
+          <div class="sec-head">
+            <span class="sec-kicker">Today's session</span>
+            <span class="sec-meta" id="todayMeta"></span>
+          </div>
+          <div class="today-cards" id="todaySessions"></div>
+        </section>
+
+        <!-- this week's rhythm -->
+        <section class="sec reveal">
+          <div class="sec-head">
+            <span class="sec-kicker">This week</span>
+            <span class="sec-meta" id="rhythmLabel"></span>
+          </div>
+          <div class="rhythm" id="rhythm"></div>
+        </section>
+
+        <!-- readiness: sleep / HRV / resting HR, straight from her watch -->
+        <section class="readiness reveal" id="readiness" hidden>
+          <div class="rd-head">
+            <span class="rd-kicker">Readiness · <span id="rdDate">–</span></span>
+            <span class="rd-verdict" id="rdVerdict">–</span>
+          </div>
+          <div class="rd-metrics">
+            <div class="rd-metric"><div class="rd-n" id="rdSleep">–</div><div class="rd-l">sleep</div><div class="rd-sub" id="rdSleepSub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdHrv">–</div><div class="rd-l">HRV</div><div class="rd-sub" id="rdHrvSub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdRhr">–</div><div class="rd-l">resting HR</div><div class="rd-sub" id="rdRhrSub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdSteps">–</div><div class="rd-l">steps</div><div class="rd-sub"></div></div>
+          </div>
+          <div class="rd-note" id="rdNote"></div>
+        </section>
+
+        <div class="coach-note reveal" id="coachNote"></div>
+
+        <!-- week review -->
+        <section class="review reveal" id="review">
+          <div class="rv-head">
+            <div>
+              <div class="rv-kicker">Week review</div>
+              <div class="rv-range" id="rvRange">–</div>
+            </div>
+            <div class="rv-nav">
+              <button class="rv-arrow" id="rvPrev" aria-label="Previous week">‹</button>
+              <button class="rv-arrow" id="rvNext" aria-label="Next week">›</button>
+            </div>
+          </div>
+
+          <div class="rv-top">
+            <div class="rv-count"><b id="rvCount">0/0</b><span id="rvPct">0%</span></div>
+            <div class="rv-verdict" id="rvVerdict">–</div>
+          </div>
+          <div class="rv-bar" id="rvBar"></div>
+          <div class="rv-key">
+            <span><i class="rv-dot done"></i> completed</span>
+            <span><i class="rv-dot missed"></i> missed</span>
+            <span><i class="rv-dot upcoming"></i> still to come</span>
+          </div>
+
+          <div class="rv-missed" id="rvMissed" hidden></div>
+
+          <div class="rv-feedback" id="rvFeedback">
+            <div class="rv-fb-label" id="rvFbLabel">How did the week go?</div>
+            <div class="rv-chips" id="rvChips"></div>
+            <textarea id="rvNote" rows="3" placeholder="Anything worth remembering — how the legs felt, what got in the way, what you'd change…"></textarea>
+            <div class="rv-saved" id="rvSaved"></div>
+          </div>
+        </section>
+
+        <!-- up next -->
+        <section class="upnext reveal" id="upnext">
+          <div class="upnext-head"><span class="upnext-kicker">Coming up</span></div>
+          <div class="upnext-list" id="upnextList"></div>
+        </section>
+
+      </div>
+    </section>
+
+    <!-- ===================== PLAN (calendar) ===================== -->
+    <section id="view-calendar" hidden>
+      <div class="wrap">
+
+        <header class="page-head reveal">
           <div class="ph-kicker">Season 2026 – 2027 · one build, three races</div>
-          <h1 class="ph-title">Harriet's Season</h1>
+          <h1 class="ph-title">The Plan</h1>
           <p class="ph-sub">There is no way around the hard work. Embrace it.</p>
           <div class="race-chips" id="goals">
             <button class="goal-btn g-sprint" data-race="sprint"><span class="g-emoji">🏊‍♀️ 🚴‍♀️ 🏃‍♀️ · Race one</span><b>Sprint Triathlon</b><span class="g-date">📅 26 Sep 2026</span></button>
@@ -67,10 +177,7 @@
           </div>
         </header>
 
-        <div class="coach-note" id="coachNote"></div>
-
-        <!-- calendar card -->
-        <section class="cal-card">
+        <section class="cal-card reveal">
           <div class="cal-head">
             <div class="cal-head-l">
               <h2 id="cal-title">Month</h2>
@@ -106,8 +213,7 @@
           <div class="legend" id="legend"></div>
         </section>
 
-        <!-- insights -->
-        <section class="insights">
+        <section class="insights reveal">
           <div class="ins-stats">
             <div class="ins-stat"><div class="n" id="stat-week">0/0</div><div class="l">this week</div><div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
             <div class="ins-div"></div>
@@ -129,34 +235,33 @@
           </div>
         </section>
 
-        <!-- up next -->
-        <section class="upnext" id="upnext">
-          <div class="upnext-head"><span class="upnext-kicker">Up next · from today</span></div>
-          <div class="upnext-list" id="upnextList"></div>
-        </section>
-
         <p class="hint">Tap any day for the sessions · open a workout for the full breakdown · swap days if you feel like moving a session around.</p>
         <button class="reset-link" id="resetBtn">reset all progress</button>
-      </section>
+      </div>
+    </section>
 
-      <!-- ===== BLOCKS VIEW ===== -->
-      <section id="view-blocks" hidden>
-        <div class="blocks-intro">
-          <h2>The macro plan</h2>
-          <p>One continuous build, five blocks, three races. It follows the <b>80/20 polarized model</b> — the vast majority easy and aerobic, a small sharp slice hard. That's what turns months of Zone 2 into an Ironman.</p>
+    <!-- ===================== JOURNEY (blocks) ===================== -->
+    <section id="view-blocks" hidden>
+      <div class="wrap">
+        <div class="blocks-intro reveal">
+          <div class="ph-kicker">The macro plan</div>
+          <h2>One build, three races</h2>
+          <p>Five blocks, stacked end to end. It follows the <b>80/20 polarized model</b> — the vast majority easy and aerobic, a small sharp slice hard. That's what turns months of Zone 2 into an Ironman.</p>
         </div>
         <div class="blocks-list" id="blocksList"></div>
-        <div class="ali-card">
+        <div class="ali-card reveal">
           <div class="ali-quote" id="aliQuote"></div>
           <div class="ali-sign">— Ali ♡</div>
         </div>
-      </section>
+      </div>
+    </section>
 
-      <footer class="site-foot">
+    <footer class="site-foot">
+      <div class="wrap">
         <p class="foot">built by Ali — for the strongest girl I know ♡</p>
-        <p class="foot-mini">Garmin sync coming soon · progress syncs across your devices</p>
-      </footer>
-    </main>
+        <p class="foot-mini">progress syncs across your devices</p>
+      </div>
+    </footer>
   </div>
 
   <!-- drawer -->
@@ -207,6 +312,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="data.js?v=8"></script>
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>

@@ -18,7 +18,7 @@
   const DOW = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 
   // ---------- state ----------
-  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {} }; }
+  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {}, imported: d.imported || {}, reviews: d.reviews || {} }; }
   function loadLocal() { try { return normalize(JSON.parse(localStorage.getItem(LOCAL_KEY))); } catch (e) { return normalize(); } }
   function saveLocal() { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); }
   let state = loadLocal();
@@ -35,14 +35,23 @@
     document.getElementById("syncText").textContent = label || ({ live: "synced", saving: "saving…", offline: "offline" }[s] || s);
   }
   let saveTimer = null;
+  // Guards against our own realtime echo clobbering newer local edits: a write
+  // started before you finished typing would otherwise come back and overwrite
+  // whatever you typed in the meantime.
+  let lastSentJson = null, lastEditAt = 0;
+  const ECHO_QUIET_MS = 3000;
+
   function persist() {
     saveLocal();
+    lastEditAt = Date.now();
     if (!sb) return;
     setSync("saving");
     clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {
+      const snapshot = JSON.stringify(state);
       try {
         const { error } = await sb.from("athlete_state").upsert({ id: ATHLETE_ID, data: state, updated_at: new Date().toISOString() });
+        if (!error) lastSentJson = snapshot;
         setSync(error ? "offline" : "live");
       } catch (e) { setSync("offline"); }
     }, 500);
@@ -56,11 +65,431 @@
       setSync(error ? "offline" : "live");
       sb.channel("athlete").on("postgres_changes",
         { event: "*", schema: "public", table: "athlete_state", filter: "id=eq." + ATHLETE_ID },
-        payload => { if (payload.new && payload.new.data) { state = normalize(payload.new.data); saveLocal(); rerenderAll(); } }
+        payload => {
+          if (!payload.new || !payload.new.data) return;
+          const incoming = JSON.stringify(payload.new.data);
+          if (incoming === lastSentJson) return;                     // our own write coming back
+          if (Date.now() - lastEditAt < ECHO_QUIET_MS) return;       // mid-edit — don't stomp it
+          state = normalize(payload.new.data); saveLocal(); rerenderAll();
+        }
       ).subscribe();
     } catch (e) { setSync("offline"); }
   }
-  function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
+  function rerenderAll() { renderCalendar(); renderUpNext(); recomputeStats(); renderReview(); renderToday(); if (!document.getElementById("agenda").hidden) renderAgenda(); }
+
+  // ---------- activity sync: Garmin → intervals.icu → here ----------
+  // Garmin's own API is business-only, so we read from intervals.icu, which
+  // syncs from Garmin automatically. The API key stays in the edge function —
+  // it grants full access to the intervals.icu account, so it never ships here.
+  // Flip this to true once the function is deployed (see ICU_SETUP.md).
+  const ICU_SYNC_ENABLED = true;
+  const ICU_FN = SB_URL + "/functions/v1/icu-sync";
+
+  // intervals.icu activity type → our session type. Unlisted types are ignored.
+  const ICU_TYPES = {
+    Run: "run", TrailRun: "run", VirtualRun: "run", Treadmill: "run",
+    Ride: "bike", VirtualRide: "bike", GravelRide: "bike", MountainBikeRide: "bike", EBikeRide: "bike",
+    Swim: "swim", OpenWaterSwim: "swim",
+    WeightTraining: "strength", Crossfit: "strength", Workout: "strength",
+    Yoga: "mobility", Walk: "mobility", Hike: "mobility", Elliptical: "mobility"
+  };
+
+  async function icuCall(action, extra) {
+    const res = await fetch(ICU_FN, {
+      method: "POST",
+      // The publishable key goes on `apikey` ONLY. It is not a JWT, so sending it
+      // as `Authorization: Bearer` makes the platform try to parse it as one and
+      // reject the call with 401 before the function runs.
+      headers: { "Content-Type": "application/json", "apikey": SB_KEY },
+      body: JSON.stringify(Object.assign({ action: action }, extra || {}))
+    });
+    return res.json();
+  }
+
+  function setSyncBtn(label, ok) {
+    const b = document.getElementById("icuBtn"); if (!b) return;
+    b.textContent = label;
+    b.classList.toggle("connected", !!ok);
+  }
+
+  // Match one activity to a planned session on the same day, and tick it.
+  function applyActivity(a) {
+    const type = ICU_TYPES[a.type];
+    if (!type) return false;
+    const iso = String(a.start_local || "").slice(0, 10);
+    if (!iso) return false;
+    const tag = "icu:" + a.id;
+    if (state.imported[tag]) return false;            // already counted
+
+    const sessions = sessionsOfDay(iso);
+    for (let i = 0; i < sessions.length; i++) {
+      if (sessions[i].type !== type) continue;
+      const key = keyFor(iso, i);
+      if (state.done[key]) continue;                   // already ticked by hand
+      state.done[key] = true;
+      state.imported[tag] = key;
+      return true;
+    }
+    return false;
+  }
+
+  async function syncActivities(opts) {
+    const quiet = opts && opts.quiet;
+    try {
+      if (!quiet) setSyncBtn("syncing…", true);
+      const r = await icuCall("sync", {});
+      if (r.error) { if (!quiet) alert("Sync failed: " + r.error); setSyncBtn("Sync", false); return; }
+
+      let n = 0;
+      (r.activities || []).forEach(a => { if (applyActivity(a)) n++; });
+      if (n) { persist(); rerenderAll(); }
+      setSyncBtn(n ? "✓ " + n + " synced" : "✓ Synced", true);
+      if (n) setTimeout(() => setSyncBtn("✓ Synced", true), 4000);
+    } catch (e) {
+      if (!quiet) alert("Couldn't reach the sync service.");
+      setSyncBtn("Sync", false);
+    }
+  }
+
+  // ---------- TODAY view ----------
+  const ICONS = { run: "🏃‍♀️", bike: "🚴‍♀️", swim: "🏊‍♀️", strength: "💪", mobility: "🧘‍♀️", rest: "🌙", race: "🏁" };
+
+  function nextRaceInfo() {
+    const races = [[TP.SPRINT_TRI, "Sprint Triathlon"], [TP.IPSWICH_HALF, "Ipswich Half"], [TP.RACE_703, "Ironman 70.3"]];
+    let prev = TP.PLAN_START;
+    for (let i = 0; i < races.length; i++) {
+      if (races[i][0] >= today) return { iso: races[i][0], name: races[i][1], from: prev };
+      prev = races[i][0];
+    }
+    return null;
+  }
+
+  function renderHero() {
+    const day = dayOf(today), dt = TP.parse(today);
+    const phase = day.phase.label + (day.weekNum ? " · Week " + day.weekNum : "");
+    document.getElementById("heroPhase").textContent = phase;
+    document.getElementById("heroDay").textContent = day.dayName;
+    document.getElementById("heroDate").textContent = dt.getDate() + " " + MONTHS[dt.getMonth()] + " " + dt.getFullYear();
+
+    // tint the hero to the day's dominant discipline
+    const real = sessionsOfDay(today).filter(s => s.type !== "rest");
+    const lead = real.length ? real[0].type : "rest";
+    document.getElementById("hero").setAttribute("data-lead", lead);
+
+    const r = nextRaceInfo();
+    const ring = document.getElementById("hcFill");
+    const C = 2 * Math.PI * 52;
+    if (r) {
+      const left = TP.daysBetween(today, r.iso);
+      const span = Math.max(1, TP.daysBetween(r.from, r.iso));
+      const gone = Math.min(1, Math.max(0, TP.daysBetween(r.from, today) / span));
+      document.getElementById("heroCountdown").textContent = left;
+      document.getElementById("heroCountLabel").textContent = "days to " + r.name;
+      document.getElementById("heroCountSub").textContent = Math.round(gone * 100) + "% of the way there";
+      ring.style.strokeDasharray = C;
+      ring.style.strokeDashoffset = C * (1 - gone);
+    } else {
+      document.getElementById("heroCountdown").textContent = "🎉";
+      document.getElementById("heroCountLabel").textContent = "season complete";
+      document.getElementById("heroCountSub").textContent = "";
+      ring.style.strokeDasharray = C; ring.style.strokeDashoffset = 0;
+    }
+  }
+
+  function renderTodaySessions() {
+    const wrap = document.getElementById("todaySessions");
+    const sessions = sessionsOfDay(today);
+    const real = sessions.filter(s => s.type !== "rest");
+    const doneCount = sessions.filter((s, i) => s.type !== "rest" && state.done[keyFor(today, i)]).length;
+
+    document.getElementById("todayMeta").textContent = real.length
+      ? doneCount + " of " + real.length + " done"
+      : "";
+
+    if (!sessions.length) {
+      wrap.innerHTML = '<div class="tcard t-rest"><div class="tc-top"><div class="tc-badge">🌙</div>' +
+        '<div class="tc-meta"><div class="tc-type">Off plan</div><h3>Nothing scheduled</h3>' +
+        '<div class="tc-sub">The plan runs 27 Jul 2026 → 9 May 2027.</div></div></div></div>';
+      return;
+    }
+
+    wrap.innerHTML = sessions.map((s, idx) => {
+      const mm = meta(s.type), isRest = s.type === "rest";
+      const done = !!state.done[keyFor(today, idx)];
+      const blocks = (s.blocks || []).slice(0, 3).map(b =>
+        '<div class="tc-block"><span class="tcb-l">' + b.label + '</span><span class="tcb-t">' + b.text + '</span></div>').join("");
+      return '<article class="tcard' + (done ? " done" : "") + (isRest ? " t-rest" : "") + '" data-idx="' + idx + '" style="--acc:' + mm.color + '">' +
+        '<div class="tc-glow"></div>' +
+        '<div class="tc-top">' +
+          '<div class="tc-badge">' + (ICONS[s.type] || "•") + '</div>' +
+          '<div class="tc-meta">' +
+            '<div class="tc-type">' + mm.label + (done ? ' · <b>done</b>' : '') + '</div>' +
+            '<h3>' + s.title + '</h3>' +
+            (s.sub ? '<div class="tc-sub">' + s.sub + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+        (blocks ? '<div class="tc-blocks">' + blocks + '</div>' : '') +
+        '<div class="tc-actions">' +
+          (isRest ? '' : '<button class="tc-tick' + (done ? " on" : "") + '" data-idx="' + idx + '">' + (done ? "✓ Completed" : "Mark complete") + '</button>') +
+          '<button class="tc-more" data-iso="' + today + '">Full workout →</button>' +
+        '</div>' +
+      '</article>';
+    }).join("");
+
+    wrap.querySelectorAll(".tc-tick").forEach(b => b.addEventListener("click", e => {
+      e.stopPropagation();
+      if (!ensureEdit()) return;
+      const i = Number(b.getAttribute("data-idx"));
+      toggleDone(today, i, !state.done[keyFor(today, i)]);
+      renderTodaySessions(); renderRhythm(); renderReview(); recomputeStats(); renderCalendar();
+    }));
+    wrap.querySelectorAll(".tc-more").forEach(b => b.addEventListener("click", () => openDrawer(today)));
+  }
+
+  function renderRhythm() {
+    const el = document.getElementById("rhythm");
+    const monday = mondayOf(today < TP.PLAN_START ? TP.PLAN_START : today);
+    let done = 0, total = 0;
+    let html = "";
+    for (let i = 0; i < 7; i++) {
+      const d = TP.addDays(monday, i), dt = TP.parse(d);
+      const ss = sessionsOfDay(d), real = ss.filter(x => x.type !== "rest");
+      const dn = ss.filter((x, j) => x.type !== "rest" && state.done[keyFor(d, j)]).length;
+      done += dn; total += real.length;
+      const isToday = d === today;
+      const state_ = !real.length ? "rest" : (dn === real.length ? "done" : (d < today ? "missed" : "todo"));
+      const dots = real.length
+        ? real.slice(0, 3).map(x => '<i style="background:' + meta(x.type).color + '"></i>').join("")
+        : '<i class="rest-dot"></i>';
+      html += '<button class="rh-day ' + state_ + (isToday ? " is-today" : "") + '" data-iso="' + d + '">' +
+        '<span class="rh-dow">' + DOW[i] + '</span>' +
+        '<span class="rh-num">' + dt.getDate() + '</span>' +
+        '<span class="rh-dots">' + dots + '</span>' +
+      '</button>';
+    }
+    el.innerHTML = html;
+    el.querySelectorAll(".rh-day").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
+    document.getElementById("rhythmLabel").textContent = total ? done + "/" + total + " sessions" : "";
+  }
+
+  function renderToday() { renderHero(); renderTodaySessions(); renderRhythm(); }
+
+  // ---------- scroll reveal ----------
+  function initMotion() {
+    if (!("IntersectionObserver" in window)) {
+      document.querySelectorAll(".reveal").forEach(n => n.classList.add("in"));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); } });
+    }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+    document.querySelectorAll(".reveal").forEach(n => io.observe(n));
+  }
+  function armReveals() {
+    // re-observe anything added or revealed after a view switch
+    document.querySelectorAll(".reveal:not(.in)").forEach(n => {
+      const r = n.getBoundingClientRect();
+      if (r.top < innerHeight * 0.95) n.classList.add("in");
+    });
+  }
+
+  // ---------- week review ----------
+  // Completion is only half the story: this also names what was missed and gives
+  // her somewhere to say why, which is the bit that's actually useful later.
+  const RV_REASONS = ["Too tired", "Illness", "No time", "Work", "Travel", "Weather", "Injury niggle", "Chose to rest"];
+  let rvMonday = null;   // Monday of the week being reviewed
+
+  // Every real session in a week, tagged done / missed / upcoming.
+  function weekSessions(monday) {
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      const d = TP.addDays(monday, i);
+      sessionsOfDay(d).forEach((s, idx) => {
+        if (s.type === "rest") return;
+        const done = !!state.done[keyFor(d, idx)];
+        out.push({ iso: d, idx: idx, s: s, status: done ? "done" : (d < today ? "missed" : "upcoming") });
+      });
+    }
+    return out;
+  }
+
+  function rvRangeLabel(monday) {
+    const a = TP.parse(monday), b = TP.parse(TP.addDays(monday, 6));
+    const sameMonth = a.getMonth() === b.getMonth();
+    return a.getDate() + (sameMonth ? "" : " " + MON_ABBR[a.getMonth()]) + " – " +
+      b.getDate() + " " + MON_ABBR[b.getMonth()] + " " + b.getFullYear();
+  }
+
+  function saveReview(patch) {
+    const cur = state.reviews[rvMonday] || { reasons: [], note: "" };
+    state.reviews[rvMonday] = Object.assign({}, cur, patch);
+    persist();
+    const tag = document.getElementById("rvSaved");
+    if (tag) { tag.textContent = "saved ✓"; clearTimeout(tag._t); tag._t = setTimeout(() => { tag.textContent = ""; }, 2000); }
+  }
+
+  let rvNoteTimer = null;
+  function renderReview() {
+    const el = document.getElementById("review");
+    if (!el) return;
+    if (!rvMonday) rvMonday = mondayOf(today < TP.PLAN_START ? TP.PLAN_START : today);
+
+    const items = weekSessions(rvMonday);
+    const done = items.filter(x => x.status === "done").length;
+    const missed = items.filter(x => x.status === "missed");
+    const total = items.length;
+    const pct = total ? Math.round(done / total * 100) : 0;
+
+    document.getElementById("rvRange").textContent = rvRangeLabel(rvMonday);
+    document.getElementById("rvCount").textContent = done + "/" + total;
+    document.getElementById("rvPct").textContent = pct + "%";
+
+    // next arrow stops at the current week
+    document.getElementById("rvNext").disabled = rvMonday >= mondayOf(today);
+
+    // segmented bar — one block per session, so the shape of the week is visible
+    document.getElementById("rvBar").innerHTML = total
+      ? items.map(x => '<i class="rv-seg ' + x.status + '" title="' +
+          DOW[TP.weekdayMon0(x.iso)] + " · " + x.s.title.replace(/"/g, "") + ' (' + x.status + ')"></i>').join("")
+      : '<i class="rv-seg upcoming"></i>';
+
+    // verdict
+    const vd = document.getElementById("rvVerdict");
+    const settled = missed.length === 0 && items.every(x => x.status !== "upcoming");
+    if (!total) { vd.textContent = "no sessions"; vd.className = "rv-verdict"; }
+    else if (settled) { vd.textContent = "✓ Perfect week"; vd.className = "rv-verdict good"; }
+    else if (missed.length === 0) { vd.textContent = "On track"; vd.className = "rv-verdict good"; }
+    else if (missed.length <= 2) { vd.textContent = missed.length + " missed"; vd.className = "rv-verdict mid"; }
+    else { vd.textContent = missed.length + " missed"; vd.className = "rv-verdict low"; }
+
+    // what was actually missed
+    const mw = document.getElementById("rvMissed");
+    if (missed.length) {
+      mw.innerHTML = '<div class="rv-missed-title">Missed this week</div>' +
+        missed.map(x => {
+          const mm = meta(x.s.type), dt = TP.parse(x.iso);
+          return '<button class="rv-miss" data-iso="' + x.iso + '">' +
+            '<i class="rv-miss-dot" style="background:' + mm.color + '"></i>' +
+            '<span class="rv-miss-day">' + DOW[TP.weekdayMon0(x.iso)] + " " + dt.getDate() + " " + MON_ABBR[dt.getMonth()] + '</span>' +
+            '<span class="rv-miss-name">' + shortTitle(x.s.title) + '</span></button>';
+        }).join("") +
+        '<div class="rv-missed-note">Missing a session is normal — the plan is built to absorb it. Tap one to open that day.</div>';
+      mw.hidden = false;
+      mw.querySelectorAll(".rv-miss").forEach(b =>
+        b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
+    } else { mw.hidden = true; mw.innerHTML = ""; }
+
+    // reflective feedback
+    const saved = state.reviews[rvMonday] || { reasons: [], note: "" };
+    document.getElementById("rvFbLabel").textContent = missed.length
+      ? "What got in the way?" : "How did the week go?";
+    document.getElementById("rvChips").innerHTML = RV_REASONS.map(r =>
+      '<button class="rv-chip' + (saved.reasons.indexOf(r) > -1 ? " on" : "") + '" data-r="' + r + '">' + r + '</button>').join("");
+    document.getElementById("rvChips").querySelectorAll(".rv-chip").forEach(b =>
+      b.addEventListener("click", () => {
+        if (!ensureEdit()) return;
+        const r = b.getAttribute("data-r");
+        const cur = (state.reviews[rvMonday] || { reasons: [] }).reasons.slice();
+        const i = cur.indexOf(r);
+        if (i > -1) cur.splice(i, 1); else cur.push(r);
+        saveReview({ reasons: cur });
+        b.classList.toggle("on");
+      }));
+
+    const ta = document.getElementById("rvNote");
+    if (document.activeElement !== ta) ta.value = saved.note || "";
+    ta.oninput = () => {
+      if (!editing) { ta.value = saved.note || ""; ensureEdit(); return; }
+      clearTimeout(rvNoteTimer);
+      rvNoteTimer = setTimeout(() => saveReview({ note: ta.value }), 600);
+    };
+  }
+
+  // ---------- readiness strip (sleep / HRV / resting HR) ----------
+  // Wellness syncs from Garmin every day, including days with no workout, so
+  // this works even while there are no recorded activities to tick off.
+  function mean(xs) { return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null; }
+
+  function renderReadiness(days) {
+    const el = document.getElementById("readiness");
+    if (!el || !days || !days.length) return;
+
+    // newest day carrying any signal
+    const sorted = days.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+    const latest = sorted[sorted.length - 1];
+    if (!latest) return;
+
+    // baselines from the trailing window, excluding the day being judged
+    const prior = sorted.slice(0, -1).slice(-28);
+    const hrvBase = mean(prior.map(d => d.hrv).filter(v => typeof v === "number"));
+    const rhrBase = mean(prior.map(d => d.resting_hr).filter(v => typeof v === "number"));
+
+    const sleepH = latest.sleep_s ? latest.sleep_s / 3600 : null;
+    const hrv = typeof latest.hrv === "number" ? latest.hrv : null;
+    const rhr = typeof latest.resting_hr === "number" ? latest.resting_hr : null;
+
+    const set = (id, txt) => { const n = document.getElementById(id); if (n) n.textContent = txt; };
+    const delta = (v, base, invert) => {
+      if (v === null || base === null) return "";
+      const d = v - base, r = Math.round(d * 10) / 10;
+      const good = invert ? d <= 0 : d >= 0;
+      return (r > 0 ? "+" : "") + r + " vs avg" + (good ? " ✓" : "");
+    };
+
+    set("rdDate", latest.date === today ? "last night" : latest.date);
+    set("rdSleep", sleepH ? sleepH.toFixed(1) + "h" : "—");
+    set("rdSleepSub", latest.sleep_score ? "score " + latest.sleep_score : (sleepH ? "" : "not recorded"));
+    set("rdHrv", hrv !== null ? String(hrv) : "—");
+    set("rdHrvSub", delta(hrv, hrvBase, false));
+    set("rdRhr", rhr !== null ? String(rhr) : "—");
+    set("rdRhrSub", delta(rhr, rhrBase, true));
+    set("rdSteps", latest.steps ? latest.steps.toLocaleString() : "—");
+
+    // Simple, conservative read — flags only where we actually have a signal.
+    const flags = [];
+    if (sleepH !== null && sleepH < 6) flags.push("short sleep");
+    if (hrv !== null && hrvBase !== null && hrv < hrvBase * 0.92) flags.push("HRV below your baseline");
+    if (rhr !== null && rhrBase !== null && rhr > rhrBase + 3) flags.push("resting HR up");
+
+    const badge = document.getElementById("rdVerdict");
+    let verdict, cls, note;
+    if (flags.length >= 2) {
+      verdict = "Go easy"; cls = "rd-verdict low";
+      note = "Your body's asking for a lighter day — " + flags.join(" and ") + ". Keep today easy, or swap the hard session to tomorrow.";
+    } else if (flags.length === 1) {
+      verdict = "Steady"; cls = "rd-verdict mid";
+      note = "Mostly fine, but " + flags[0] + ". Start easy and see how the legs feel before pushing.";
+    } else if (hrv === null && sleepH === null) {
+      verdict = "No data"; cls = "rd-verdict mid";
+      note = "Nothing recorded overnight — worth checking the watch was worn.";
+    } else {
+      verdict = "Primed"; cls = "rd-verdict good";
+      note = "Sleep and HRV are where they should be. A good day to take on the hard session.";
+    }
+    if (badge) { badge.textContent = verdict; badge.className = cls; }
+    set("rdNote", note);
+
+    el.hidden = false;
+  }
+
+  async function loadReadiness() {
+    if (!ICU_SYNC_ENABLED) return;
+    try {
+      const r = await icuCall("wellness", {});
+      if (r && r.days && r.days.length) renderReadiness(r.days);
+    } catch (e) { /* readiness is a bonus — never block the app on it */ }
+  }
+
+  async function initActivitySync() {
+    const b = document.getElementById("icuBtn"); if (!b) return;
+    if (!ICU_SYNC_ENABLED) { b.hidden = true; return; }   // nothing deployed yet
+
+    b.addEventListener("click", () => { if (ensureEdit()) syncActivities({}); });
+
+    const st = await icuCall("status", {}).catch(() => null);
+    if (st && st.connected) { setSyncBtn("✓ Synced", true); syncActivities({ quiet: true }); }
+    else { setSyncBtn("Sync", false); }
+  }
 
   // ---------- PIN / edit lock ----------
   let editing = sessionStorage.getItem("htp_edit") === "1" || localStorage.getItem("htp_trust") === "1";
@@ -479,10 +908,13 @@
     document.querySelectorAll(".seg").forEach(s => s.classList.remove("active"));
     seg.classList.add("active");
     const v = seg.getAttribute("data-view");
+    document.getElementById("view-today").hidden = v !== "today";
     document.getElementById("view-calendar").hidden = v !== "calendar";
     document.getElementById("view-blocks").hidden = v !== "blocks";
     if (v === "blocks") renderBlocks();
+    if (v === "today") renderToday();
     window.scrollTo({ top: 0, behavior: "smooth" });
+    setTimeout(armReveals, 60);
   }));
   document.querySelectorAll(".goal-btn").forEach(b => b.addEventListener("click", () => setFocus(b.getAttribute("data-race"))));
   document.getElementById("focusClear").addEventListener("click", () => setFocus(focusRace));
@@ -512,6 +944,16 @@
     if (editing) { editing = false; sessionStorage.removeItem("htp_edit"); setLockUI(); if (currentIso && drawer.classList.contains("open")) openDrawer(currentIso); }
     else openPin();
   });
+  document.getElementById("heroScroll").addEventListener("click", () => {
+    document.getElementById("todaySec").scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+
+  document.getElementById("rvPrev").addEventListener("click", () => { rvMonday = TP.addDays(rvMonday, -7); renderReview(); });
+  document.getElementById("rvNext").addEventListener("click", () => {
+    if (rvMonday >= mondayOf(today)) return;
+    rvMonday = TP.addDays(rvMonday, 7); renderReview();
+  });
+
   document.getElementById("pinOk").addEventListener("click", tryPin);
   document.getElementById("pinCancel").addEventListener("click", closePin);
   document.getElementById("pinScrim").addEventListener("click", e => { if (e.target.id === "pinScrim") closePin(); });
@@ -525,12 +967,15 @@
   // ---------- splash + init ----------
   (function splash() {
     const el = document.getElementById("splash"), app = document.getElementById("app");
-    const reveal = () => { if (app.classList.contains("show")) return; el.classList.add("hidden"); app.classList.add("show"); setTimeout(armCalendarFlip, 340); };
+    const reveal = () => { if (app.classList.contains("show")) return; el.classList.add("hidden"); app.classList.add("show"); setTimeout(armReveals, 380); };
     document.getElementById("splashSkip").addEventListener("click", reveal);   // user actively enters
   })();
 
   setLockUI();
   fcSet(TP.parse(today));                 // seed the flip card so it's never blank
-  renderCalendar(); renderUpNext(); recomputeStats();
+  renderCalendar(); renderUpNext(); recomputeStats(); renderReview(); renderToday();
+  initMotion();
   cloudInit();
+  initActivitySync();
+  loadReadiness();
 })();
