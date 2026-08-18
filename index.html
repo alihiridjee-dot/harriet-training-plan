@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=31">
+<link rel="stylesheet" href="styles.css?v=32">
 </head>
 <body>
 
@@ -61,6 +61,7 @@
         <div class="hero-bg" id="heroBg"></div>
         <div class="hero-grain"></div>
         <div class="hero-inner">
+          <div class="hero-left">
           <div class="hero-kicker" id="heroPhase">—</div>
           <h1 class="hero-day" id="heroDay">—</h1>
           <div class="hero-date" id="heroDate">—</div>
@@ -78,23 +79,23 @@
               <div class="hc-sub" id="heroCountSub"></div>
             </div>
           </div>
+          </div>
+
+          <div class="hero-right">
+            <div class="hs-head">
+              <span class="hs-kicker">Today's session</span>
+              <span class="hs-meta" id="todayMeta"></span>
+            </div>
+            <div class="today-cards" id="todaySessions"></div>
+          </div>
         </div>
         <button class="hero-scroll" id="heroScroll" aria-label="Scroll to today's session"><span></span></button>
       </header>
 
       <div class="wrap">
 
-        <!-- today's sessions -->
-        <section class="sec reveal" id="todaySec">
-          <div class="sec-head">
-            <span class="sec-kicker">Today's session</span>
-            <span class="sec-meta" id="todayMeta"></span>
-          </div>
-          <div class="today-cards" id="todaySessions"></div>
-        </section>
-
         <!-- this week's rhythm -->
-        <section class="sec reveal">
+        <section class="sec reveal" id="afterHero">
           <div class="sec-head">
             <span class="sec-kicker">This week</span>
             <span class="sec-meta" id="rhythmLabel"></span>
@@ -312,6 +313,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="data.js?v=8"></script>
-  <script src="app.js?v=31"></script>
+  <script src="app.js?v=32"></script>
 </body>
 </html>

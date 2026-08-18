@@ -945,7 +945,7 @@
     else openPin();
   });
   document.getElementById("heroScroll").addEventListener("click", () => {
-    document.getElementById("todaySec").scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("afterHero").scrollIntoView({ behavior: "smooth", block: "start" });
   });
 
   document.getElementById("rvPrev").addEventListener("click", () => { rvMonday = TP.addDays(rvMonday, -7); renderReview(); });
