@@ -718,12 +718,29 @@
     document.getElementById("fcYear").textContent = d.getFullYear();
   }
   function fcRandom() { const y = Math.random() < 0.5 ? 2026 : 2027; return new Date(y, Math.floor(Math.random() * 12), 1 + Math.floor(Math.random() * 28), 12); }
+  // The flip card is an opaque overlay sitting on top of the month grid, and the
+  // grid starts hidden — so nothing here is optional: if this never runs, the
+  // calendar is invisible. Always reachable, always cleared.
+  function revealCalendar() {
+    const flip = document.getElementById("flipCal"), stage = document.getElementById("calStage");
+    if (flip) flip.classList.add("gone");
+    if (stage) stage.classList.add("opened");
+  }
+
   // Flips smoothly through dates, lands on today, then the card opens into the month grid.
   function openCalendar() {
     if (rolled) return; rolled = true;
     const page = document.getElementById("fcPage"), flip = document.getElementById("flipCal"), stage = document.getElementById("calStage");
+    if (!page || !flip || !stage) return;
+
+    // No animation for reduced motion — show the plan straight away.
+    if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) { revealCalendar(); return; }
+
+    // Safety net: whatever happens to the animation, the grid is never left covered.
+    setTimeout(revealCalendar, 4000);
+
     const todayDt = TP.parse(today);
-    const seq = []; for (let i = 0; i < 9; i++) seq.push(150 + i * i * 3.4); // fewer, decelerating = smoother
+    const seq = []; for (let i = 0; i < 5; i++) seq.push(140 + i * i * 3.4); // short enough not to keep her waiting
     const DOWN = "cubic-bezier(.32,0,.67,0)", UP = "cubic-bezier(.33,1,.68,1)";
     let i = 0;
     (function step() {
@@ -734,15 +751,18 @@
         fcSet(last ? todayDt : fcRandom());
         page.style.transition = "transform " + (dur * 0.48) + "ms " + UP;
         page.style.transform = "rotateX(0deg)";                     // new page settles
-        if (last) { page.classList.add("land"); setTimeout(() => { flip.classList.add("gone"); stage.classList.add("opened"); }, 640); }
+        if (last) { page.classList.add("land"); setTimeout(revealCalendar, 520); }
         else { i++; setTimeout(step, dur * 0.48 + 26); }
       }, dur * 0.52);
     })();
   }
+  // OPTIONAL INTRO — not currently wired to anything. The Plan tab calls
+  // revealCalendar() directly so the grid appears instantly. If you ever want the
+  // flip animation back, call armCalendarFlip() instead of revealCalendar() in the
+  // view switch; openCalendar() has its own safety net so it can never leave the
+  // grid covered the way it did before.
   function armCalendarFlip() {
-    // bring the calendar into view first, then flip it open — so the animation is always seen
-    document.querySelector(".cal-card").scrollIntoView({ behavior: "smooth", block: "start" });
-    setTimeout(openCalendar, 720);
+    setTimeout(openCalendar, 120);
   }
 
   // ---------- blocks ----------
@@ -913,6 +933,7 @@
     document.getElementById("view-blocks").hidden = v !== "blocks";
     if (v === "blocks") renderBlocks();
     if (v === "today") renderToday();
+    if (v === "calendar") revealCalendar();    // she opened Plan to see the plan — show it immediately
     window.scrollTo({ top: 0, behavior: "smooth" });
     setTimeout(armReveals, 60);
   }));
