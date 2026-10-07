@@ -127,15 +127,59 @@ Rules that keep it safe:
 
 ## What else the data drives
 
-- **Session cards** show the real distance, time, pace and average HR under the plan.
-- **From your watch** (Today): this week's swim/bike/run/time against last week, the
-  latest workouts, and a fitness/fatigue/form chart. That uses the standard 42-day/7-day
-  model on intervals.icu's training load; workouts with no load count at 60 per hour.
-- **Week review** adds what the watch recorded that week.
-- **Race-distance check** (Journey): the longest swim, ride and run in the last 8 weeks
-  against the 70.3 distances.
-- **Readiness** only shows when the newest sleep/HRV is at most 3 days old. If health
-  data stops arriving, the watch section says when it last came through.
+- **Readiness hero** (Today): last night's sleep, HRV and resting HR against her own
+  4-week normal, plus training form, boiled down to one line: "Good to go", "Steady does
+  it" or "Take it easy today". On a "take it easy" day with a hard session planned, it
+  offers to swap with the gentlest day left in the week (PIN-gated, one tap).
+- **Planned vs actual**: every session matched to a workout shows distance/time/pace/HR
+  and a heart-rate zone bar. Easy days count time at or below the planned zone, hard days
+  time at or above it ("Ran too hard for an easy day · 2% in Zone 1–2"). Swims are
+  skipped, because wrist HR in water isn't reliable.
+- **Progress tab**: fitness/fatigue/form (42/7-day model on intervals.icu load), training
+  hours per week, a **70.3 finish estimate** (best swim, ride and run of the last 8 weeks,
+  adjusted for open water, ride length and running off the bike), the race-distance
+  check, swim pace (CSS) and the week review.
+
+## Workouts on her watch
+
+The next 14 days are pushed to her intervals.icu calendar as structured workouts, and
+intervals.icu sends them to Garmin. Each run, bike and swim session in `data.js` carries
+`ws`, which is intervals.icu workout-builder text (`m` = minutes, `mtr` = metres, run paces
+from the plan's own targets, rides by HR zone). A brick's run off the bike goes over as its
+own run workout.
+
+- **Every morning** `.github/workflows/watch.yml` runs `scripts/push-plan.mjs`.
+- **The site** pushes straight after a swap or reset, and once a day from each device as a backstop.
+- Re-pushing is safe: workouts are keyed `htp-<date>-<slot>`, so they update rather than
+  duplicate, and anything in the window that's no longer in the plan is removed.
+
+**One-time setting:** intervals.icu → Settings → Garmin → turn on **upload planned
+workouts**. Without it the workouts land on the intervals.icu calendar but not on the watch.
+
+## Swim pace (CSS)
+
+CSS = (400 m time − 200 m time) ÷ 2 per 100 m. The plan has a CSS test on the first
+Wednesday of Base and then every six weeks. When a test session gets a watch swim, the
+site reads its laps (`intervals` action), finds the 400 and the 200, and updates CSS. Every
+"@ CSS" target in the plan and every swim pushed to the watch then uses it. Times can also be
+entered by hand on the Progress tab.
+
+## Cheer alerts for Ali
+
+Every 15 minutes the workflow calls the `notify` action. Any new big session (run of 15 km
+or 80 min+, ride of 50 km or 2 h+, swim of 1.5 km+, any open-water swim, or load of 100+)
+is sent as a push notification through [ntfy](https://ntfy.sh) to the topic stored in the
+`NTFY_TOPIC` Supabase secret. To receive them, install the ntfy app and subscribe to that
+topic. The topic name is the only thing protecting it, so keep it private. The first run only
+records existing workouts, so it never sends a backlog. Seen workouts are stored in
+`athlete_state` row `notify`.
+
+## Allowed origins
+
+The function only answers browsers on the origins in `ALLOWED` in
+`supabase/functions/icu-sync/index.ts`. **If the site's domain changes, add it there and
+redeploy**, or the browser blocks every call and the site shows no Garmin data. That is
+what happened when the site moved to harrietmeerstraining.co.uk.
 
 ## Rate limits
 
