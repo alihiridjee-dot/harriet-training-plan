@@ -1075,15 +1075,78 @@
       .map(t => '<span><i class="dot" style="background:' + col(t) + '"></i>' + TP.TYPE_META[t].label + '</span>').join("");
   })();
 
-  // ---------- splash ----------
-  // Shown once per visit; tap to skip, or it fades on its own.
+  // ---------- splash: cinematic landing ----------
   (function splash() {
     const el = $("splash");
+    // shown once per visit — reopening the app mid-session goes straight in
     let seen = false; try { seen = sessionStorage.getItem("htp_splash") === "1"; } catch (e) { /* ignore */ }
-    const go = () => { el.classList.add("hidden"); try { sessionStorage.setItem("htp_splash", "1"); } catch (e) { /* ignore */ } };
     if (seen) { el.hidden = true; return; }
-    el.addEventListener("click", go);
-    setTimeout(go, 2600);
+    const emblem = document.getElementById("spEmblem");
+    const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let running = !still;
+
+    // split the wordmark into letters so they can slam in one by one
+    let i = 0;
+    el.querySelectorAll(".splash-word > span").forEach(part => {
+      part.innerHTML = [...part.textContent].map(ch => '<span class="l" style="--i:' + (i++) + '">' + ch + "</span>").join("");
+    });
+
+    // embers drifting up out of the dark
+    const cv = document.getElementById("spEmbers"), cx = cv.getContext("2d");
+    let W = 0, H = 0, dpr = 1, motes = [];
+    const size = () => {
+      dpr = Math.min(devicePixelRatio || 1, 2);
+      W = cv.width = innerWidth * dpr; H = cv.height = innerHeight * dpr;
+    };
+    const spawn = (y) => ({
+      x: Math.random() * W, y: y != null ? y : H + Math.random() * H * 0.2,
+      r: (0.6 + Math.random() * 1.9) * dpr, v: (0.35 + Math.random() * 1.1) * dpr,
+      w: Math.random() * Math.PI * 2, ws: 0.008 + Math.random() * 0.02,
+      a: 0.25 + Math.random() * 0.6, hue: 350 + Math.random() * 30
+    });
+    function tick() {
+      if (!running) return;
+      if (!H) { size(); requestAnimationFrame(tick); return; }
+      cx.clearRect(0, 0, W, H);
+      cx.globalCompositeOperation = "lighter";
+      motes.forEach((m, k) => {
+        m.y -= m.v; m.w += m.ws; m.x += Math.sin(m.w) * 0.45 * dpr;
+        if (m.y < -10) { motes[k] = spawn(); return; }
+        const fade = H ? Math.max(0, Math.min(1, m.y / (H * 0.35))) : 0;   // dim out near the top
+        const g = cx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r * 4);
+        g.addColorStop(0, "hsla(" + m.hue + ",100%,72%," + (m.a * fade) + ")");
+        g.addColorStop(1, "hsla(" + m.hue + ",100%,50%,0)");
+        cx.fillStyle = g; cx.beginPath(); cx.arc(m.x, m.y, m.r * 4, 0, Math.PI * 2); cx.fill();
+      });
+      requestAnimationFrame(tick);
+    }
+    if (running) {
+      size(); addEventListener("resize", size);
+      const n = innerWidth < 600 ? 45 : 85;
+      for (let k = 0; k < n; k++) motes.push(spawn(Math.random() * H));
+      requestAnimationFrame(tick);
+
+      // emblem tilts toward the pointer
+      el.addEventListener("pointermove", e => {
+        const x = e.clientX / innerWidth - 0.5, y = e.clientY / innerHeight - 0.5;
+        emblem.style.setProperty("--ry", (x * 22).toFixed(2) + "deg");
+        emblem.style.setProperty("--rx", (-y * 22).toFixed(2) + "deg");
+      });
+      el.addEventListener("pointerleave", () => { emblem.style.setProperty("--rx", "0deg"); emblem.style.setProperty("--ry", "0deg"); });
+    }
+
+    const reveal = () => {
+      if (el.classList.contains("hidden") || el.classList.contains("warp")) return;
+      const done = () => {
+        el.classList.add("hidden");
+        try { sessionStorage.setItem("htp_splash", "1"); } catch (e) { /* ignore */ }
+        setTimeout(() => { running = false; }, 900);   // stop the embers once faded
+      };
+      if (still) return done();
+      el.classList.add("warp");   // punch through the emblem, then hand over
+      setTimeout(done, 560);
+    };
+    document.getElementById("splashSkip").addEventListener("click", reveal);   // user actively enters
   })();
 
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
