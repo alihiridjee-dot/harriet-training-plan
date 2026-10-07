@@ -4,12 +4,20 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Harriet · Ironman Journey</title>
-<meta name="description" content="Harriet Meers — Sprint Triathlon · Ipswich Half · Ironman 70.3. Built on the 80/20 polarized model. Made by Ali ♡">
-<meta name="theme-color" content="#121419">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=35">
+<meta name="description" content="Harriet Meers — the road to Ironman 70.3. Built on the 80/20 polarized model by her best friend, Ali.">
+<meta name="theme-color" content="#F5F2EC" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0E0F12" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<!-- add-to-home-screen: runs full screen like a native app -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Harriet">
+<meta name="format-detection" content="telephone=no">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="styles.css?v=40">
 </head>
 <body>
 
@@ -59,7 +67,7 @@
       </div>
       <div class="splash-word" data-text="IRONMAN 70.3"><span class="sw-a">IRONMAN</span> <span class="sw-b">70.3</span></div>
       <div class="splash-name"><span>Harriet's journey</span></div>
-      <div class="splash-sig">for you — from Ali ♡</div>
+      <div class="splash-sig">from your best friend, Ali</div>
       <button class="splash-enter" id="splashSkip">Enter <span>→</span></button>
     </div>
   </div>
@@ -67,43 +75,41 @@
   <!-- ============ APP ============ -->
   <div class="app" id="app">
 
-    <!-- sticky nav -->
-    <nav class="topnav">
-      <div class="nav-inner">
-        <div class="nav-brand">
-          <svg viewBox="0 0 300 320" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <circle cx="150" cy="66" r="55"/><path d="M95,150 L205,150 L205,300 L173,300 L161,226 L150,259 L139,226 L127,300 L95,300 Z"/>
-          </svg>
-          <span>Harriet</span>
-        </div>
-        <div class="segmented" role="tablist">
-          <button class="seg active" data-view="today" role="tab">Today</button>
-          <button class="seg" data-view="calendar" role="tab">Plan</button>
-          <button class="seg" data-view="blocks" role="tab">Journey</button>
-        </div>
-        <div class="tools">
-          <span class="sync-pill" id="syncPill" title="Sync status"><i class="dot"></i><span id="syncText">connecting…</span></span>
-          <button class="icu-btn" id="icuBtn" title="Pull completed activities (Garmin syncs via intervals.icu)">Sync</button>
-          <button class="lock-btn" id="editLock" title="Edit access">🔒</button>
+    <!-- compact iOS-style bar: title fades in once the large title scrolls away -->
+    <header class="navbar" id="navbar">
+      <div class="nb-inner">
+        <span class="sync-pill" id="syncPill" title="Sync status"><i class="dot"></i><span id="syncText">connecting…</span></span>
+        <div class="nb-title" id="nbTitle">Today</div>
+        <div class="nb-tools">
+          <button class="icon-btn" id="icuBtn" aria-label="Sync activities from Garmin">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16m0 4v-4h-4"/></svg>
+            <span class="icu-label" id="icuLabel"></span>
+          </button>
+          <button class="icon-btn" id="editLock" aria-label="Edit access">
+            <svg class="i-locked" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+            <svg class="i-unlocked" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 7.7-1.5"/></svg>
+          </button>
         </div>
       </div>
-    </nav>
+    </header>
 
-    <!-- ===================== TODAY ===================== -->
-    <section id="view-today">
+    <main class="main">
 
-      <!-- cinematic hero -->
-      <header class="hero" id="hero">
-        <div class="hero-bg" id="heroBg"></div>
-        <div class="hero-grain"></div>
-        <div class="hero-inner">
-          <div class="hero-left">
-          <div class="hero-kicker" id="heroPhase">—</div>
-          <h1 class="hero-day" id="heroDay">—</h1>
-          <div class="hero-date" id="heroDate">—</div>
+      <!-- ===================== TODAY ===================== -->
+      <section class="view" id="view-today">
+        <div class="large-title">
+          <div class="lt-kicker" id="heroDate">—</div>
+          <h1 id="greeting">Hi Harriet</h1>
+        </div>
 
+        <!-- hero: today's phase + countdown -->
+        <div class="hero card" id="hero">
+          <div class="hero-top">
+            <div class="hero-kicker" id="heroPhase">—</div>
+            <div class="hero-day" id="heroDay">—</div>
+          </div>
           <div class="hero-count">
-            <div class="hc-ring" id="hcRing">
+            <div class="hc-ring">
               <svg viewBox="0 0 120 120" aria-hidden="true">
                 <circle class="hc-track" cx="60" cy="60" r="52"/>
                 <circle class="hc-fill" id="hcFill" cx="60" cy="60" r="52"/>
@@ -115,240 +121,232 @@
               <div class="hc-sub" id="heroCountSub"></div>
             </div>
           </div>
-          </div>
+        </div>
 
-          <div class="hero-right">
-            <div class="hs-head">
-              <span class="hs-kicker">Today's session</span>
-              <span class="hs-meta" id="todayMeta"></span>
-            </div>
-            <div class="today-cards" id="todaySessions"></div>
+        <div class="sec-head">
+          <h2>Today's training</h2>
+          <span class="sec-meta" id="todayMeta"></span>
+        </div>
+        <div class="today-cards" id="todaySessions"></div>
+
+        <div class="sec-head">
+          <h2>This week</h2>
+          <span class="sec-meta" id="rhythmLabel"></span>
+        </div>
+        <div class="rhythm card" id="rhythm"></div>
+
+        <!-- a message from her best friend -->
+        <div class="bf-note" id="coachNote" hidden>
+          <div class="bf-avatar" aria-hidden="true">A</div>
+          <div class="bf-bubble">
+            <div class="bf-from">Ali · your best friend</div>
+            <div class="bf-text" id="coachText"></div>
           </div>
         </div>
-        <button class="hero-scroll" id="heroScroll" aria-label="Scroll to today's session"><span></span></button>
-      </header>
-
-      <div class="wrap">
-
-        <!-- this week's rhythm -->
-        <section class="sec reveal" id="afterHero">
-          <div class="sec-head">
-            <span class="sec-kicker">This week</span>
-            <span class="sec-meta" id="rhythmLabel"></span>
-          </div>
-          <div class="rhythm" id="rhythm"></div>
-        </section>
 
         <!-- readiness: sleep / HRV / resting HR, straight from her watch -->
-        <section class="readiness reveal" id="readiness" hidden>
-          <div class="rd-head">
-            <span class="rd-kicker">Readiness · <span id="rdDate">–</span></span>
+        <section class="readiness card" id="readiness" hidden>
+          <div class="card-head">
+            <span class="card-kicker">Readiness · <span id="rdDate">–</span></span>
             <span class="rd-verdict" id="rdVerdict">–</span>
           </div>
           <div class="rd-metrics">
-            <div class="rd-metric"><div class="rd-n" id="rdSleep">–</div><div class="rd-l">sleep</div><div class="rd-sub" id="rdSleepSub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdSleep">–</div><div class="rd-l">Sleep</div><div class="rd-sub" id="rdSleepSub"></div></div>
             <div class="rd-metric"><div class="rd-n" id="rdHrv">–</div><div class="rd-l">HRV</div><div class="rd-sub" id="rdHrvSub"></div></div>
-            <div class="rd-metric"><div class="rd-n" id="rdRhr">–</div><div class="rd-l">resting HR</div><div class="rd-sub" id="rdRhrSub"></div></div>
-            <div class="rd-metric"><div class="rd-n" id="rdSteps">–</div><div class="rd-l">steps</div><div class="rd-sub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdRhr">–</div><div class="rd-l">Rest HR</div><div class="rd-sub" id="rdRhrSub"></div></div>
+            <div class="rd-metric"><div class="rd-n" id="rdSteps">–</div><div class="rd-l">Steps</div><div class="rd-sub"></div></div>
           </div>
           <div class="rd-note" id="rdNote"></div>
         </section>
 
-        <div class="coach-note reveal" id="coachNote"></div>
-
         <!-- week review -->
-        <section class="review reveal" id="review">
+        <div class="sec-head">
+          <h2>Week review</h2>
+        </div>
+        <section class="review card" id="review">
           <div class="rv-head">
-            <div>
-              <div class="rv-kicker">Week review</div>
-              <div class="rv-range" id="rvRange">–</div>
-            </div>
-            <div class="rv-nav">
-              <button class="rv-arrow" id="rvPrev" aria-label="Previous week">‹</button>
-              <button class="rv-arrow" id="rvNext" aria-label="Next week">›</button>
-            </div>
+            <button class="round-btn" id="rvPrev" aria-label="Previous week"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+            <div class="rv-range" id="rvRange">–</div>
+            <button class="round-btn" id="rvNext" aria-label="Next week"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
           </div>
-
           <div class="rv-top">
             <div class="rv-count"><b id="rvCount">0/0</b><span id="rvPct">0%</span></div>
             <div class="rv-verdict" id="rvVerdict">–</div>
           </div>
           <div class="rv-bar" id="rvBar"></div>
           <div class="rv-key">
-            <span><i class="rv-dot done"></i> completed</span>
-            <span><i class="rv-dot missed"></i> missed</span>
-            <span><i class="rv-dot upcoming"></i> still to come</span>
+            <span><i class="rv-dot done"></i>Done</span>
+            <span><i class="rv-dot missed"></i>Missed</span>
+            <span><i class="rv-dot upcoming"></i>To come</span>
           </div>
-
           <div class="rv-missed" id="rvMissed" hidden></div>
-
-          <div class="rv-feedback" id="rvFeedback">
+          <div class="rv-feedback">
             <div class="rv-fb-label" id="rvFbLabel">How did the week go?</div>
             <div class="rv-chips" id="rvChips"></div>
-            <textarea id="rvNote" rows="3" placeholder="Anything worth remembering — how the legs felt, what got in the way, what you'd change…"></textarea>
-            <div class="rv-saved" id="rvSaved"></div>
+            <textarea id="rvNote" rows="3" placeholder="How the legs felt, what got in the way, what you'd change…"></textarea>
+            <div class="saved-tag" id="rvSaved"></div>
           </div>
         </section>
 
         <!-- up next -->
-        <section class="upnext reveal" id="upnext">
-          <div class="upnext-head"><span class="upnext-kicker">Coming up</span></div>
-          <div class="upnext-list" id="upnextList"></div>
+        <section id="upnext">
+          <div class="sec-head"><h2>Coming up</h2></div>
+          <div class="list card" id="upnextList"></div>
         </section>
+      </section>
 
-      </div>
-    </section>
+      <!-- ===================== PLAN ===================== -->
+      <section class="view" id="view-calendar" hidden>
+        <div class="large-title">
+          <div class="lt-kicker">Season 2026 – 27 · one build, one race</div>
+          <h1>Plan</h1>
+        </div>
 
-    <!-- ===================== PLAN (calendar) ===================== -->
-    <section id="view-calendar" hidden>
-      <div class="wrap">
+        <button class="goal-card" id="goalCard" aria-label="Spotlight the key Ironman sessions">
+          <span class="gc-l">
+            <span class="gc-top">🔥 The goal · 9 May 2027</span>
+            <b>Ironman 70.3</b>
+            <span class="gc-legs">1.9 km swim · 90 km bike · 21.1 km run</span>
+          </span>
+          <span class="gc-r"><b id="goalDays">–</b><span>days</span></span>
+        </button>
 
-        <header class="page-head reveal">
-          <div class="ph-kicker">Season 2026 – 2027 · one build, three races</div>
-          <h1 class="ph-title">The Plan</h1>
-          <p class="ph-sub">There is no way around the hard work. Embrace it.</p>
-          <div class="race-chips" id="goals">
-            <button class="goal-btn g-sprint" data-race="sprint"><span class="g-emoji">🏊‍♀️ 🚴‍♀️ 🏃‍♀️ · Race one</span><b>Sprint Triathlon</b><span class="g-date">📅 26 Sep 2026</span></button>
-            <button class="goal-btn g-half" data-race="half"><span class="g-emoji">🏅 · Sub-two</span><b>Ipswich Half</b><span class="g-date">📅 27 Sep 2026</span></button>
-            <button class="goal-btn g-key g-iron" data-race="iron"><span class="g-emoji">🔥 · The big one</span><b>Ironman 70.3</b><span class="g-date">📅 Apr / May 2027</span></button>
-          </div>
-        </header>
+        <div class="focus-banner" id="focusBanner" hidden><span>Spotlighting the key sessions — long, hard &amp; brick days</span><button id="focusClear">Clear</button></div>
 
-        <section class="cal-card reveal">
+        <div class="segmented" role="tablist" aria-label="Calendar layout">
+          <button class="seg-opt active" data-mode="month" role="tab">Month</button>
+          <button class="seg-opt" data-mode="list" role="tab">List</button>
+          <i class="seg-thumb" aria-hidden="true"></i>
+        </div>
+
+        <section class="cal card" id="calCard">
           <div class="cal-head">
-            <div class="cal-head-l">
-              <h2 id="cal-title">Month</h2>
-              <div class="cal-sub"><span id="stat-race">–</span> <span id="stat-race-l">days to next race</span></div>
-            </div>
+            <h2 id="cal-title">Month</h2>
             <div class="cal-nav">
-              <button class="btn" id="prev" aria-label="Previous month">‹</button>
-              <button class="btn" id="todayBtn">Today</button>
-              <button class="btn" id="next" aria-label="Next month">›</button>
-              <button class="btn ghost" id="expandBtn" title="Full day-by-day view">⤢</button>
+              <button class="round-btn" id="prev" aria-label="Previous month"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+              <button class="pill-btn" id="todayBtn">Today</button>
+              <button class="round-btn" id="next" aria-label="Next month"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
             </div>
           </div>
-
-          <div class="focus-banner" id="focusBanner" hidden><span id="focusText"></span><button id="focusClear">clear ✕</button></div>
-
-          <div class="weekdays"><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div></div>
-
-          <div class="cal-stage" id="calStage">
+          <div id="monthMode">
+            <div class="weekdays"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
             <div class="grid" id="grid"></div>
-            <div class="flip-cal" id="flipCal" aria-hidden="true">
-              <div class="fc-base">
-                <div class="fc-rings"><span></span><span></span></div>
-                <div class="fc-page" id="fcPage">
-                  <div class="fc-weekday" id="fcWeekday">—</div>
-                  <div class="fc-day" id="fcDay">—</div>
-                  <div class="fc-month" id="fcMonth">—</div>
-                  <div class="fc-year" id="fcYear">—</div>
-                </div>
-              </div>
-            </div>
+            <div class="legend" id="legend"></div>
           </div>
-
-          <div class="legend" id="legend"></div>
-        </section>
-
-        <section class="insights reveal">
-          <div class="ins-stats">
-            <div class="ins-stat"><div class="n" id="stat-week">0/0</div><div class="l">this week</div><div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
-            <div class="ins-div"></div>
-            <div class="ins-stat"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
-            <div class="ins-div"></div>
-            <div class="ins-stat"><div class="n" id="stat-total">0</div><div class="l">sessions banked</div></div>
-          </div>
-          <div class="ins-polar">
-            <div class="polar-head">
-              <div class="polar-kicker">This week · 80/20 polarized</div>
-              <div class="polar-badge" id="polarBadge">–</div>
-            </div>
-            <div class="polar-bar"><i class="pb-easy" id="pbEasy" style="width:80%"></i><i class="pb-hard" id="pbHard" style="width:20%"></i></div>
-            <div class="polar-legend">
-              <span><i class="pl-dot easy"></i> Easy <b id="pbEasyPct">80%</b></span>
-              <span><i class="pl-dot hard"></i> Hard <b id="pbHardPct">20%</b></span>
-              <span class="polar-sub" id="polarSub">mostly easy, so the hard days count.</span>
-            </div>
+          <div id="listMode" hidden>
+            <div class="agenda" id="agendaBody"></div>
           </div>
         </section>
 
-        <p class="hint">Tap any day for the sessions · open a workout for the full breakdown · swap days if you feel like moving a session around.</p>
-        <button class="reset-link" id="resetBtn">reset all progress</button>
-      </div>
-    </section>
+        <!-- selected day, iOS-Calendar style -->
+        <section class="day-peek" id="dayPeek"></section>
 
-    <!-- ===================== JOURNEY (blocks) ===================== -->
-    <section id="view-blocks" hidden>
-      <div class="wrap">
-        <div class="blocks-intro reveal">
-          <div class="ph-kicker">The macro plan</div>
-          <h2>One build, three races</h2>
-          <p>Five blocks, stacked end to end. It follows the <b>80/20 polarized model</b> — the vast majority easy and aerobic, a small sharp slice hard. That's what turns months of Zone 2 into an Ironman.</p>
-        </div>
-        <div class="blocks-list" id="blocksList"></div>
-        <div class="ali-card reveal">
-          <div class="ali-quote" id="aliQuote"></div>
-          <div class="ali-sign">— Ali ♡</div>
-        </div>
-      </div>
-    </section>
+        <div class="sec-head"><h2>Progress</h2></div>
+        <section class="stats">
+          <div class="stat card"><div class="n" id="stat-week">0/0</div><div class="l">this week</div><div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
+          <div class="stat card"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
+          <div class="stat card"><div class="n" id="stat-total">0</div><div class="l">sessions done</div></div>
+        </section>
+        <section class="polar card">
+          <div class="card-head">
+            <span class="card-kicker">This week · 80/20 polarized</span>
+            <span class="polar-badge" id="polarBadge">–</span>
+          </div>
+          <div class="polar-bar"><i class="pb-easy" id="pbEasy" style="width:80%"></i><i class="pb-hard" id="pbHard" style="width:20%"></i></div>
+          <div class="polar-legend">
+            <span><i class="pl-dot easy"></i>Easy <b id="pbEasyPct">80%</b></span>
+            <span><i class="pl-dot hard"></i>Hard <b id="pbHardPct">20%</b></span>
+          </div>
+          <div class="polar-sub" id="polarSub">Mostly easy, so the hard days count.</div>
+          <div class="cal-sub"><b id="stat-race">–</b> <span id="stat-race-l">days to Ironman 70.3</span></div>
+        </section>
 
-    <footer class="site-foot">
-      <div class="wrap">
-        <p class="foot">built by Ali — for the strongest girl I know ♡</p>
-        <p class="foot-mini">progress syncs across your devices</p>
-      </div>
-    </footer>
+        <button class="reset-link" id="resetBtn">Reset all progress</button>
+      </section>
+
+      <!-- ===================== JOURNEY ===================== -->
+      <section class="view" id="view-blocks" hidden>
+        <div class="large-title">
+          <div class="lt-kicker">The macro plan</div>
+          <h1>Journey</h1>
+        </div>
+        <div class="card intro">
+          <p>Five blocks, stacked end to end. It follows the <b>80/20 polarized model</b> — most of it easy and aerobic, a small sharp slice hard. That's what turns months of Zone 2 into an Ironman.</p>
+          <div class="season">
+            <div class="season-bar"><i id="seasonFill"></i></div>
+            <div class="season-l"><span>27 Jul 2026</span><b id="seasonPct">0%</b><span>9 May 2027</span></div>
+          </div>
+        </div>
+        <div class="timeline" id="blocksList"></div>
+        <div class="bf-card">
+          <div class="bf-quote" id="aliQuote"></div>
+          <div class="bf-sign">— Ali, your best friend &amp; biggest fan</div>
+        </div>
+        <footer class="site-foot">
+          <p>Built by Ali for his best friend — the strongest person he knows.</p>
+          <p class="foot-mini">Progress syncs across your devices</p>
+        </footer>
+      </section>
+    </main>
+
+    <!-- bottom tab bar -->
+    <nav class="tabbar" role="tablist" aria-label="Sections">
+      <button class="tab active" data-view="today" role="tab" aria-label="Today">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
+        <span>Today</span>
+      </button>
+      <button class="tab" data-view="calendar" role="tab" aria-label="Plan">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
+        <span>Plan</span>
+      </button>
+      <button class="tab" data-view="blocks" role="tab" aria-label="Journey">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
+        <span>Journey</span>
+      </button>
+    </nav>
   </div>
 
-  <!-- drawer -->
+  <!-- day sheet -->
   <div class="scrim" id="scrim"></div>
-  <aside class="drawer" id="drawer" aria-label="Day detail">
-    <div class="drawer-head" id="drawer-head">
-      <button class="dclose" id="dclose" aria-label="Close">×</button>
-      <div class="dphase" id="d-phase"></div>
-      <h3 id="d-title"></h3>
-      <div class="ddate" id="d-date"></div>
-      <span class="devent" id="d-event" style="display:none"></span>
-      <div class="dactions">
-        <button class="dact" id="swapBtn">⇄ Swap this day</button>
-        <button class="dact ghost" id="resetDayBtn" hidden>↺ reset day</button>
+  <aside class="sheet" id="drawer" aria-label="Day detail" role="dialog" aria-modal="true">
+    <div class="sheet-grab" id="sheetGrab">
+      <div class="grabber"></div>
+      <div class="sheet-head" id="drawer-head">
+        <div>
+          <div class="dphase" id="d-phase"></div>
+          <h3 id="d-title"></h3>
+          <div class="ddate" id="d-date"></div>
+          <span class="devent" id="d-event" hidden></span>
+        </div>
+        <button class="close-btn" id="dclose" aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
-      <div class="swap-picker" id="swapPicker" hidden></div>
     </div>
-    <div class="drawer-body" id="d-body"></div>
+    <div class="sheet-body" id="d-body"></div>
   </aside>
 
-  <!-- agenda overlay -->
-  <div class="agenda" id="agenda" hidden>
-    <div class="agenda-head">
-      <div class="agenda-nav">
-        <button class="btn" id="agPrev">‹</button>
-        <h2 id="agTitle">Month</h2>
-        <button class="btn" id="agNext">›</button>
+  <!-- PIN sheet -->
+  <div class="pin-scrim" id="pinScrim" hidden>
+    <div class="pin-sheet" role="dialog" aria-modal="true" aria-labelledby="pinTitle">
+      <div class="grabber"></div>
+      <h3 id="pinTitle">Unlock editing</h3>
+      <p>Enter the PIN to tick off sessions, add notes and swap days.</p>
+      <div class="pin-dots" id="pinDots"><i></i><i></i><i></i><i></i></div>
+      <div class="pin-err" id="pinErr"></div>
+      <div class="keypad" id="keypad">
+        <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+        <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+        <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+        <button class="kp-text" id="pinCancel">Cancel</button><button data-k="0">0</button>
+        <button class="kp-text" data-k="del" aria-label="Delete"><svg viewBox="0 0 24 24"><path d="M9 5h11v14H9l-6-7z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/></svg></button>
       </div>
-      <button class="btn solid" id="agClose">Done</button>
+      <label class="switch-row"><span>Trust this device</span><input type="checkbox" id="pinTrust" checked><i class="switch" aria-hidden="true"></i></label>
     </div>
-    <div class="agenda-body" id="agendaBody"></div>
   </div>
 
-  <!-- PIN modal -->
-  <div class="modal-scrim" id="pinScrim" hidden>
-    <div class="modal">
-      <h3>Unlock editing</h3>
-      <p>Enter the PIN to tick off sessions, add notes and swap days.</p>
-      <input type="password" inputmode="numeric" id="pinInput" placeholder="• • • •" maxlength="8" autocomplete="off">
-      <div class="pin-err" id="pinErr"></div>
-      <label class="pin-trust"><input type="checkbox" id="pinTrust" checked> Trust this device — don't ask again</label>
-      <div class="modal-actions">
-        <button class="btn" id="pinCancel">Cancel</button>
-        <button class="btn solid" id="pinOk">Unlock</button>
-      </div>
-    </div>
-  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="data.js?v=8"></script>
-  <script src="app.js?v=35"></script>
+  <script src="data.js?v=9"></script>
+  <script src="app.js?v=40"></script>
 </body>
 </html>
