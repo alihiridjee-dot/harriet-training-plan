@@ -1,0 +1,35 @@
+# Two small jobs that keep the site's Garmin features running when nobody has
+# the page open:
+#   - every 15 min: ask icu-sync to ping Ali (ntfy) about any big new session
+#   - every morning: push the next two weeks of the plan to her watch
+name: Watch sync
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+jobs:
+  notify:
+    if: github.event.schedule != '30 4 * * *'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cheer alert
+        run: |
+          curl -sf -X POST https://notibogaoeqakmeyxhar.supabase.co/functions/v1/icu-sync \
+            -H "apikey: sb_publishable_PzxYn1w0zQwHku16EPtTXQ_GGan7WEL" \
+            -H "Content-Type: application/json" -d '{"action":"notify"}'
+
+  push-plan:
+    if: github.event.schedule == '30 4 * * *' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      TZ: Europe/London
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Push the next 14 days to her watch
+        run: node scripts/push-plan.mjs

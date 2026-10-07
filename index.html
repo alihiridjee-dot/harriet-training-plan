@@ -17,7 +17,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=41">
+<link rel="stylesheet" href="styles.css?v=42">
 </head>
 <body>
 
@@ -102,29 +102,20 @@
           <h1 id="greeting">Hi Harriet</h1>
         </div>
 
-        <!-- hero: today's phase + countdown -->
-        <div class="hero card" id="hero">
+        <!-- one card that answers "how am I today?" — readiness, form, countdown -->
+        <section class="hero card" id="hero" data-level="none">
           <div class="hero-top">
-            <div class="hero-kicker" id="heroPhase">—</div>
-            <div class="hero-day" id="heroDay">—</div>
+            <span class="hero-kicker" id="heroPhase">—</span>
+            <span class="hero-count"><b id="heroCountdown">–</b> days to go</span>
           </div>
-          <div class="hero-count">
-            <div class="hc-ring">
-              <svg viewBox="0 0 120 120" aria-hidden="true">
-                <circle class="hc-track" cx="60" cy="60" r="52"/>
-                <circle class="hc-fill" id="hcFill" cx="60" cy="60" r="52"/>
-              </svg>
-              <div class="hc-mid"><span class="hc-n" id="heroCountdown">–</span><span class="hc-u">days</span></div>
-            </div>
-            <div class="hc-side">
-              <div class="hc-label" id="heroCountLabel">to your next race</div>
-              <div class="hc-sub" id="heroCountSub"></div>
-            </div>
-          </div>
-        </div>
+          <div class="hero-head" id="heroHead">Hello</div>
+          <p class="hero-note" id="heroNote"></p>
+          <div class="hero-metrics" id="heroMetrics"></div>
+          <div class="hero-sugg" id="heroSugg" hidden></div>
+        </section>
 
         <div class="sec-head">
-          <h2>Today's training</h2>
+          <h2>Today</h2>
           <span class="sec-meta" id="todayMeta"></span>
         </div>
         <div class="today-cards" id="todaySessions"></div>
@@ -133,7 +124,10 @@
           <h2>This week</h2>
           <span class="sec-meta" id="rhythmLabel"></span>
         </div>
-        <div class="rhythm card" id="rhythm"></div>
+        <section class="week card">
+          <div class="rhythm" id="rhythm"></div>
+          <div class="week-vol" id="weekVol"></div>
+        </section>
 
         <!-- a message from her best friend -->
         <div class="bf-note" id="coachNote" hidden>
@@ -144,76 +138,14 @@
           </div>
         </div>
 
-        <!-- readiness: sleep / HRV / resting HR, straight from her watch -->
-        <section class="readiness card" id="readiness" hidden>
-          <div class="card-head">
-            <span class="card-kicker">Readiness · <span id="rdDate">–</span></span>
-            <span class="rd-verdict" id="rdVerdict">–</span>
-          </div>
-          <div class="rd-metrics">
-            <div class="rd-metric"><div class="rd-n" id="rdSleep">–</div><div class="rd-l">Sleep</div><div class="rd-sub" id="rdSleepSub"></div></div>
-            <div class="rd-metric"><div class="rd-n" id="rdHrv">–</div><div class="rd-l">HRV</div><div class="rd-sub" id="rdHrvSub"></div></div>
-            <div class="rd-metric"><div class="rd-n" id="rdRhr">–</div><div class="rd-l">Rest HR</div><div class="rd-sub" id="rdRhrSub"></div></div>
-            <div class="rd-metric"><div class="rd-n" id="rdSteps">–</div><div class="rd-l">Steps</div><div class="rd-sub"></div></div>
-          </div>
-          <div class="rd-note" id="rdNote"></div>
-        </section>
-
-        <!-- from the watch: Garmin → intervals.icu → here -->
-        <section id="watch" hidden>
+        <section id="latest" hidden>
           <div class="sec-head">
-            <h2>From your watch</h2>
+            <h2>Latest</h2>
             <span class="sec-meta" id="watchMeta"></span>
           </div>
-          <div class="vol card" id="weekVol"></div>
-          <section class="fitness card" id="fitness" hidden>
-            <div class="card-head">
-              <span class="card-kicker">Fitness · last 12 weeks</span>
-              <span class="rd-verdict" id="fitVerdict">–</span>
-            </div>
-            <div class="fit-tiles">
-              <div class="fit-t"><div class="fit-n" id="fitCtl">–</div><div class="fit-l">Fitness</div><div class="fit-sub" id="fitCtlSub"></div></div>
-              <div class="fit-t"><div class="fit-n" id="fitAtl">–</div><div class="fit-l">Fatigue</div><div class="fit-sub">last 7 days</div></div>
-              <div class="fit-t"><div class="fit-n" id="fitForm">–</div><div class="fit-l">Form</div><div class="fit-sub">fitness − fatigue</div></div>
-            </div>
-            <div class="fit-chart" id="fitChart"></div>
-            <div class="rd-note" id="fitNote"></div>
-          </section>
           <div class="list card" id="latestActs"></div>
-          <div class="watch-note" id="wellnessNote" hidden></div>
         </section>
 
-        <!-- week review -->
-        <div class="sec-head">
-          <h2>Week review</h2>
-        </div>
-        <section class="review card" id="review">
-          <div class="rv-head">
-            <button class="round-btn" id="rvPrev" aria-label="Previous week"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-            <div class="rv-range" id="rvRange">–</div>
-            <button class="round-btn" id="rvNext" aria-label="Next week"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
-          </div>
-          <div class="rv-top">
-            <div class="rv-count"><b id="rvCount">0/0</b><span id="rvPct">0%</span></div>
-            <div class="rv-verdict" id="rvVerdict">–</div>
-          </div>
-          <div class="rv-bar" id="rvBar"></div>
-          <div class="rv-key">
-            <span><i class="rv-dot done"></i>Done</span>
-            <span><i class="rv-dot missed"></i>Missed</span>
-            <span><i class="rv-dot upcoming"></i>To come</span>
-          </div>
-          <div class="rv-watch" id="rvWatch"></div>
-          <div class="rv-missed" id="rvMissed" hidden></div>
-          <div class="rv-feedback">
-            <div class="rv-fb-label" id="rvFbLabel">How did the week go?</div>
-            <div class="rv-chips" id="rvChips"></div>
-            <textarea id="rvNote" rows="3" placeholder="How the legs felt, what got in the way, what you'd change…"></textarea>
-            <div class="saved-tag" id="rvSaved"></div>
-          </div>
-        </section>
-
-        <!-- up next -->
         <section id="upnext">
           <div class="sec-head"><h2>Coming up</h2></div>
           <div class="list card" id="upnextList"></div>
@@ -266,7 +198,116 @@
         <!-- selected day, iOS-Calendar style -->
         <section class="day-peek" id="dayPeek"></section>
 
-        <div class="sec-head"><h2>Progress</h2></div>
+        <!-- the plan, on her wrist -->
+        <section class="watch-push card" id="watchPush">
+          <div class="wp-icon" aria-hidden="true">⌚</div>
+          <div class="wp-main">
+            <div class="wp-title">On her watch</div>
+            <div class="wp-sub" id="wpSub">Sends the next two weeks to Garmin via intervals.icu</div>
+          </div>
+          <button class="pill-btn" id="wpBtn">Send</button>
+        </section>
+
+        <button class="reset-link" id="resetBtn">Reset all progress</button>
+      </section>
+
+      <!-- ===================== PROGRESS ===================== -->
+      <section class="view" id="view-progress" hidden>
+        <div class="large-title">
+          <div class="lt-kicker" id="progKicker">From her watch</div>
+          <h1>Progress</h1>
+        </div>
+
+        <section class="fitness card" id="fitness" hidden>
+          <div class="card-head">
+            <span class="card-kicker">Fitness</span>
+            <span class="chip" id="fitVerdict">–</span>
+          </div>
+          <div class="big-line">
+            <span class="big-n" id="fitCtl">–</span>
+            <span class="big-d" id="fitCtlSub"></span>
+          </div>
+          <div class="kv-line"><span>Fatigue <b id="fitAtl">–</b></span><span>Form <b id="fitForm">–</b></span></div>
+          <div class="chart" id="fitChart"></div>
+          <p class="card-foot" id="fitNote"></p>
+        </section>
+
+        <section class="hours card" id="hours" hidden>
+          <div class="card-head">
+            <span class="card-kicker">Training time · last 12 weeks</span>
+          </div>
+          <div class="big-line">
+            <span class="big-n" id="hoursNow">–</span>
+            <span class="big-d" id="hoursSub"></span>
+          </div>
+          <div class="chart" id="hoursChart"></div>
+        </section>
+
+        <section class="predict card" id="predict" hidden>
+          <div class="card-head">
+            <span class="card-kicker">Ironman 70.3 · estimate today</span>
+          </div>
+          <div class="big-line">
+            <span class="big-n" id="predTotal">–</span>
+            <span class="big-d" id="predRange"></span>
+          </div>
+          <div class="legs" id="predLegs"></div>
+          <p class="card-foot" id="predFoot"></p>
+        </section>
+
+        <section class="card race-ready" id="raceCard" hidden>
+          <div class="card-head"><span class="card-kicker">Race-distance check · last 8 weeks</span></div>
+          <div id="raceReady"></div>
+          <div class="card-foot" id="seasonTotals"></div>
+        </section>
+
+        <section class="css card" id="cssCard">
+          <div class="card-head">
+            <span class="card-kicker">Swim pace · CSS</span>
+            <span class="chip" id="cssSrc"></span>
+          </div>
+          <div class="big-line">
+            <span class="big-n" id="cssVal">–</span>
+            <span class="big-d" id="cssSub"></span>
+          </div>
+          <p class="card-foot" id="cssFoot"></p>
+          <button class="text-btn" id="cssEdit">Enter test times</button>
+          <div class="css-form" id="cssForm" hidden>
+            <label>400 m time<input id="css400" inputmode="numeric" placeholder="8:40"></label>
+            <label>200 m time<input id="css200" inputmode="numeric" placeholder="4:05"></label>
+            <button class="pill-btn solid" id="cssSave">Save</button>
+          </div>
+        </section>
+
+        <div class="sec-head">
+          <h2>Week review</h2>
+        </div>
+        <section class="review card" id="review">
+          <div class="rv-head">
+            <button class="round-btn" id="rvPrev" aria-label="Previous week"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+            <div class="rv-range" id="rvRange">–</div>
+            <button class="round-btn" id="rvNext" aria-label="Next week"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+          </div>
+          <div class="rv-top">
+            <div class="rv-count"><b id="rvCount">0/0</b><span id="rvPct">0%</span></div>
+            <div class="rv-verdict" id="rvVerdict">–</div>
+          </div>
+          <div class="rv-bar" id="rvBar"></div>
+          <div class="rv-key">
+            <span><i class="rv-dot done"></i>Done</span>
+            <span><i class="rv-dot missed"></i>Missed</span>
+            <span><i class="rv-dot upcoming"></i>To come</span>
+          </div>
+          <div class="rv-watch" id="rvWatch"></div>
+          <div class="rv-missed" id="rvMissed" hidden></div>
+          <div class="rv-feedback">
+            <div class="rv-fb-label" id="rvFbLabel">How did the week go?</div>
+            <div class="rv-chips" id="rvChips"></div>
+            <textarea id="rvNote" rows="3" placeholder="How the legs felt, what got in the way, what you'd change…"></textarea>
+            <div class="saved-tag" id="rvSaved"></div>
+          </div>
+        </section>
+
         <section class="stats">
           <div class="stat card"><div class="n" id="stat-week">0/0</div><div class="l">this week</div><div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
           <div class="stat card"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
@@ -285,8 +326,6 @@
           <div class="polar-sub" id="polarSub">Mostly easy, so the hard days count.</div>
           <div class="cal-sub"><b id="stat-race">–</b> <span id="stat-race-l">days to Ironman 70.3</span></div>
         </section>
-
-        <button class="reset-link" id="resetBtn">Reset all progress</button>
       </section>
 
       <!-- ===================== JOURNEY ===================== -->
@@ -302,13 +341,6 @@
             <div class="season-l"><span>27 Jul 2026</span><b id="seasonPct">0%</b><span>9 May 2027</span></div>
           </div>
         </div>
-        <section>
-          <div class="sec-head"><h2>Race-distance check</h2></div>
-          <div class="card race-ready">
-            <div id="raceReady"></div>
-            <div class="rr-foot" id="seasonTotals"></div>
-          </div>
-        </section>
         <div class="timeline" id="blocksList"></div>
         <div class="bf-card">
           <div class="bf-quote" id="aliQuote"></div>
@@ -330,6 +362,10 @@
       <button class="tab" data-view="calendar" role="tab" aria-label="Plan">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>
         <span>Plan</span>
+      </button>
+      <button class="tab" data-view="progress" role="tab" aria-label="Progress">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16M6 15l4-5 3 3 5-7"/></svg>
+        <span>Progress</span>
       </button>
       <button class="tab" data-view="blocks" role="tab" aria-label="Journey">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>
@@ -378,7 +414,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="data.js?v=9"></script>
-  <script src="app.js?v=41"></script>
+  <script src="data.js?v=10"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>

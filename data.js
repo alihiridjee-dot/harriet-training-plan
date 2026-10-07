@@ -21,6 +21,30 @@
   // ---------- session builder ----------
   function S(type, title, sub, blocks) { return { type: type, title: title, sub: sub || "", blocks: blocks || [] }; }
 
+  // ---------- watch steps ----------
+  // Run, bike and swim sessions carry `ws`: intervals.icu workout-builder text,
+  // which intervals.icu turns into a structured workout and sends to her Garmin.
+  // In that syntax "m" is minutes and "mtr" is metres; a line before a block of
+  // steps ending in "Nx" repeats it, with a blank line either side. Run paces are
+  // the plan's own km/h targets; swim paces use %CSS…% placeholders that are
+  // filled from her latest CSS (or dropped if she hasn't tested yet).
+  function W(s, ws) { s.ws = ws; return s; }
+  const PACE = {
+    easy: "6:20/km-6:55/km Pace", jog: "6:55/km-8:00/km Pace", steady: "5:56/km-6:11/km Pace",
+    tempo: "5:27/km-5:36/km Pace", thr: "5:20/km-5:35/km Pace", cruise: "5:10/km-5:20/km Pace",
+    vo2: "4:55/km-5:10/km Pace", stride: "4:37/km-5:00/km Pace"
+  };
+  // "6–8 km" → "7km", "45–60 min" → "55m", "3–4 h" → "3h30m"; null if no amount
+  function amount(txt) {
+    const m = String(txt || "").match(/(\d+(?:\.\d+)?)(?:\s*[–-]\s*(\d+(?:\.\d+)?))?\s*(km|min|h)\b/);
+    if (!m) return null;
+    const v = m[2] ? (Number(m[1]) + Number(m[2])) / 2 : Number(m[1]);
+    if (m[3] === "km") return Math.round(v) + "km";
+    if (m[3] === "h") return Math.floor(v) + "h" + (v % 1 ? Math.round(v % 1 * 60) + "m" : "");
+    return Math.round(v / 5) * 5 + "m";
+  }
+  const repeat = (label, n, steps) => "\n" + label + " " + n + "x\n" + steps.join("\n") + "\n\n";
+
   // ---------- reusable fixed sessions ----------
   const REST = () => S("rest", "Complete rest", "Optional 15-min walk or mobility", [
     { label: "Why", text: "Rest is training — this is where the weekend's work turns into fitness. Keep it truly easy: a gentle walk or 10–15 min of mobility at most." }
@@ -50,96 +74,121 @@
     { label: "Swim link", text: "Strong lats & back power your catch and hold body position late in the swim — this session serves your weakest discipline." }
   ]);
 
-  const SWIM_S1 = (note) => S("swim", "Swim — technique & drills" + (note ? " · " + note : ""), "≈ 1,750 m · 25 m pool", [
+  const SWIM_S1 = (note) => W(S("swim", "Swim — technique & drills" + (note ? " · " + note : ""), "≈ 1,750 m · 25 m pool", [
     { label: "Warm-up", text: "300 m easy (100 free / 100 back / 100 free), relaxed breathing every 3." },
     { label: "Drills", text: "6 × 50 m as catch-up · single-arm (25 L / 25 R) · fingertip-drag, @ :20. Long reach, high elbow." },
     { label: "Kick", text: "4 × 50 m kick with board, easy, @ :20." },
     { label: "Drill/swim", text: "6 × 100 m = 25 drill + 75 smooth swim, @ :25." },
     { label: "DPS", text: "4 × 50 m counting strokes — take 1 fewer stroke each 50." },
     { label: "Cool-down", text: "100 m easy, bilateral breathing (every 3)." }
-  ]);
-  const SWIM_S2 = () => S("swim", "Swim — CSS test / threshold", "≈ 1,800 m", [
+  ]), "- Warm-up 300mtr\n" + repeat("Drills", 6, ["- Drill 50mtr"]) + repeat("Kick", 4, ["- Kick 50mtr"]) +
+      repeat("Drill/swim", 6, ["- 100mtr"]) + repeat("Count strokes", 4, ["- 50mtr"]) + "- Cool-down 100mtr");
+  const SWIM_S2 = () => W(S("swim", "Swim — CSS test / threshold", "≈ 1,800 m", [
     { label: "Warm-up", text: "300 m easy + 4 × 50 build @ :20." },
     { label: "Test", text: "400 m time trial (record time) · 3–4 min rest · 200 m time trial (record). CSS/100m = (400 time − 200 time) ÷ 2." },
     { label: "Off-test weeks", text: "Replace the test with 8 × 100 m @ CSS pace, @ :15." },
     { label: "Loosen + cool-down", text: "200 m easy + 100 m easy." }
-  ]);
-  const SWIM_S3 = () => S("swim", "Swim — endurance / CSS", "≈ 2,000–2,400 m", [
+  ]), "- Warm-up 300mtr\n" + repeat("Build", 4, ["- 50mtr"]) +
+      "- Time trial 400mtr\n- Rest 3m\n- Time trial 200mtr\n- Loosen 200mtr\n- Cool-down 100mtr");
+  const SWIM_S3 = () => W(S("swim", "Swim — endurance / CSS", "≈ 2,000–2,400 m", [
     { label: "Warm-up", text: "300 m mixed + 4 × 50 drill @ :20." },
     { label: "Main", text: "Build across the block: 4 → 6 → 8 × 200 m @ CSS + 3–5 s, @ :20. Or a continuous 800 → 1,200 → 1,500 m." },
     { label: "Pull", text: "4 × 100 m pull-buoy, smooth & long, @ :20." },
     { label: "Cool-down", text: "200 m easy." }
-  ]);
+  ]), "- Warm-up 300mtr\n" + repeat("Drill", 4, ["- 50mtr"]) + repeat("Main", 6, ["- 200mtr %CSS+4%"]) +
+      repeat("Pull", 4, ["- 100mtr"]) + "- Cool-down 200mtr");
 
   // ---------- Foundation-block swims (capped ~1,000–1,100 m) ----------
   // Harriet's max to date is ~1,100 m. Summer is for technique and confidence
   // at that distance; the volume toward the 1.9 km 70.3 swim comes in winter.
-  const SWIM_P1_TECH = (note) => S("swim", "Swim — technique & drills" + (note ? " · " + note : ""), "≈ 1,000 m · 25 m pool", [
+  const SWIM_P1_TECH = (note) => W(S("swim", "Swim — technique & drills" + (note ? " · " + note : ""), "≈ 1,000 m · 25 m pool", [
     { label: "Warm-up", text: "200 m easy, relaxed breathing every 3." },
     { label: "Drills", text: "6 × 50 m — catch-up · single-arm · fingertip-drag, @ :20. Long reach, high elbow." },
     { label: "Drill/swim", text: "4 × 100 m = 25 drill + 75 smooth swim, @ :25." },
     { label: "Cool-down", text: "100 m easy, bilateral breathing (every 3)." },
     { label: "Why capped", text: "Well within your 1,100 m best — summer is for technique; the distance toward the 1.9 km 70.3 swim comes in the winter swim project." }
-  ]);
-  const SWIM_P1_CSS = () => S("swim", "Swim — CSS / pace", "≈ 1,000 m", [
+  ]), "- Warm-up 200mtr\n" + repeat("Drills", 6, ["- Drill 50mtr"]) + repeat("Drill/swim", 4, ["- 100mtr"]) + "- Cool-down 100mtr");
+  const SWIM_P1_CSS = () => W(S("swim", "Swim — CSS / pace", "≈ 1,000 m", [
     { label: "Warm-up", text: "200 m easy + 4 × 50 build @ :20." },
     { label: "Main", text: "8 × 75 m at strong, steady 'race' pace, @ :15. Even effort, controlled breathing." },
     { label: "Test option", text: "Now and then swap in a 200 m time-trial (record it) to track your CSS/100 m." },
     { label: "Cool-down", text: "200 m easy." }
-  ]);
-  const SWIM_P1_ENDUR = () => S("swim", "Swim — steady endurance", "≈ 1,000–1,100 m", [
+  ]), "- Warm-up 200mtr\n" + repeat("Build", 4, ["- 50mtr"]) + repeat("Race pace", 8, ["- 75mtr %CSS%"]) + "- Cool-down 200mtr");
+  const SWIM_P1_ENDUR = () => W(S("swim", "Swim — steady endurance", "≈ 1,000–1,100 m", [
     { label: "Warm-up", text: "200 m mixed + 4 × 50 drill @ :20." },
     { label: "Main", text: "Build across the block: 4 → 5 → 6 × 150 m steady, @ :20 — comfortable, repeatable pace." },
     { label: "Pull", text: "2 × 100 m pull-buoy, smooth & long, @ :20." },
     { label: "Cool-down", text: "100 m easy." },
     { label: "Goal", text: "Feel like 1,000 m is easy and repeatable by the end of summer — the platform for the 1.9 km 70.3 swim." }
-  ]);
+  ]), "- Warm-up 200mtr\n" + repeat("Steady", 5, ["- 150mtr %CSS+8%"]) + repeat("Pull", 2, ["- 100mtr"]) + "- Cool-down 100mtr");
 
-  const BIKE_B1 = (label, sub) => S("bike", label || "Bike — endurance", sub || "Z2 · cadence 85–95", [
+  const BIKE_B1 = (label, sub) => bikeWs(S("bike", label || "Bike — endurance", sub || "Z2 · cadence 85–95", [
     { label: "Main", text: "Ride at 22–25 km/h in Zone 2 — able to chat. Spin light gears at 85–95 rpm." },
     { label: "Skill", text: "Practise eating & drinking on the move, and spend time in a lower / aero-ish position." }
-  ]);
+  ]));
 
-  const EASY_RUN = (km, strides) => S("run", "Easy run" + (strides ? " + strides" : ""), km + " · Z2", [
+  const EASY_RUN = (km, strides) => W(S("run", "Easy run" + (strides ? " + strides" : ""), km + " · Z2", [
     { label: "Main", text: "Run at 8.7–9.5 km/h (6:55–6:20/km), conversational. Let heart rate lead — slow down if it climbs out of Z2." },
     strides ? { label: "Strides", text: "Finish with 4–6 × 20 s pick-ups at ~12–13 km/h, full recovery between. Relaxed & fast, not a sprint." } : null
-  ].filter(Boolean));
+  ].filter(Boolean)), "- Easy " + (amount(km) || "40m") + " " + PACE.easy + (strides ? "\n" + repeat("Strides", 5, ["- 20s " + PACE.stride, "- 60s " + PACE.jog]) : ""));
 
-  const LONG_RUN = (km, extra) => S("run", "Long run", km + " · Z2", [
+  const LONG_RUN = (km, extra) => W(S("run", "Long run", km + " · Z2", [
     { label: "Main", text: "Steady & easy at 8.7–9.5 km/h. This is aerobic base — keep it in Zone 2 the whole way." },
     extra ? { label: "Finish", text: extra } : null,
     { label: "Fuel", text: "Anything over ~75–90 min: take 30–60 g carbs/hour + water." }
-  ].filter(Boolean));
+  ].filter(Boolean)), "- Long run " + (amount(km) || "60m") + " " + PACE.easy);
 
-  const LONG_BIKE = (title, sub, blocks) => S("bike", title, sub, blocks);
+  const LONG_BIKE = (title, sub, blocks) => bikeWs(S("bike", title, sub, blocks));
+  // Rides go by heart-rate zone (no power meter). A brick's run off the bike
+  // becomes its own run workout (`wsBrick`), since a watch workout is one sport.
+  function bikeWs(s) {
+    const hay = s.title + " · " + s.sub, amt = amount(s.title) || amount(s.sub) || "60m";
+    const zone = /Z1–2|Z1-2/.test(hay) ? "Z1-Z2 HR" : "Z2 HR";
+    const ss = s.sub.match(/(\d+)\s*×\s*(\d+)′\s*@\s*Z3/);
+    const opener = /(\d+)\s*×\s*2 min brisk/.exec(s.sub);
+    if (ss) s.ws = "- Warm-up 15m Z2 HR\n" + repeat("Sweet spot", ss[1], ["- " + ss[2] + "m Z3 HR", "- 5m Z1-Z2 HR"]) + "- Easy spin home 20m Z2 HR";
+    else if (opener) s.ws = "- Easy 25m Z2 HR\n" + repeat("Openers", opener[1], ["- 2m Z3-Z4 HR", "- 3m Z1-Z2 HR"]) + "- Cool-down 5m Z1-Z2 HR";
+    else s.ws = "- Endurance " + amt + " " + zone;
+    const bb = (s.blocks || []).filter(b => b.label === "Brick run")[0];
+    const mins = (bb && /(\d+)\s*min/.exec(bb.text)) || /\+\s*(\d+)′\s*run/.exec(s.title);
+    if (mins) s.wsBrick = "- Brick run " + mins[1] + "m " + (/70\.3 pace|race effort/.test((bb && bb.text) || s.title + s.blocks.map(b => b.text).join(" ")) ? PACE.steady : PACE.easy);
+    return s;
+  }
   const BRICK = (mins) => ({ label: "Brick run", text: "Straight off the bike, no rest: " + mins + " easy run holding form as the legs settle. Priceless for triathlon." });
 
   // ---------- run quality library (Tuesdays) ----------
-  const R2 = () => S("run", "Run — VO₂ intervals", "6 × 400 m · Z5", [
+  const R2 = () => W(S("run", "Run — VO₂ intervals", "6 × 400 m · Z5", [
     { label: "Warm-up", text: "12–15 min easy + 3–4 strides." },
     { label: "Main", text: "6 × 400 m @ 11.6–12.2 km/h (5:10–4:55/km), 90 s easy jog between. Build toward 8 × 400 across the block." },
     { label: "Cool-down", text: "8–10 min easy." }
-  ]);
-  const R3 = (reps) => S("run", "Run — threshold reps", (reps || "5 × 1 km") + " · Z4", [
+  ]), "- Warm-up 15m " + PACE.easy + "\n" + repeat("Main set", 6, ["- 400mtr " + PACE.vo2, "- 90s " + PACE.jog]) + "- Cool-down 10m " + PACE.easy);
+  const R3 = (reps) => W(S("run", "Run — threshold reps", (reps || "5 × 1 km") + " · Z4", [
     { label: "Warm-up", text: "12–15 min easy + 3 strides." },
     { label: "Main", text: (reps || "5 × 1 km") + " @ 10.7–11.3 km/h (5:35–5:20/km), 60–75 s jog between. Comfortably hard, even splits." },
     { label: "Cool-down", text: "8–10 min easy." }
-  ]);
-  const R4 = (fmt) => S("run", "Run — tempo", (fmt || "20 min continuous") + " · Z4", [
+  ]), (function () {
+    const m = /(\d+)\s*×\s*([\d.]+)\s*km/.exec(reps || "5 × 1 km");
+    return "- Warm-up 15m " + PACE.easy + "\n" + repeat("Main set", m[1], ["- " + m[2] + "km " + PACE.thr, "- 75s " + PACE.jog]) + "- Cool-down 10m " + PACE.easy;
+  })());
+  const R4 = (fmt) => W(S("run", "Run — tempo", (fmt || "20 min continuous") + " · Z4", [
     { label: "Warm-up", text: "12–15 min easy." },
     { label: "Main", text: (fmt || "20 min continuous") + " @ 10.7–11.0 km/h. 'Comfortably hard' — short phrases only." },
     { label: "Cool-down", text: "8 min easy." }
-  ]);
-  const R5 = () => S("run", "Run — 10K cruise", "6 × 800 m · Z4", [
+  ]), (function () {
+    const m = /(\d+)\s*×\s*(\d+)\s*min/.exec(fmt || ""), c = /(\d+)\s*min continuous/.exec(fmt || "20 min continuous");
+    const main = m ? repeat("Tempo", m[1], ["- " + m[2] + "m " + PACE.tempo, "- 2m " + PACE.jog]) : "- Tempo " + (c ? c[1] : 20) + "m " + PACE.tempo + "\n";
+    return "- Warm-up 15m " + PACE.easy + "\n" + main + "- Cool-down 8m " + PACE.easy;
+  })());
+  const R5 = () => W(S("run", "Run — 10K cruise", "6 × 800 m · Z4", [
     { label: "Warm-up", text: "12–15 min easy + 3 strides." },
     { label: "Main", text: "6 × 800 m @ 11.3–11.6 km/h (5:20–5:10/km), 2 min jog between. Builds the speed that makes 70.3 run pace feel easy." },
     { label: "Cool-down", text: "8–10 min easy." }
-  ]);
-  const R6 = () => S("run", "Run — hill reps", "8 × 45 s · Z4–5", [
+  ]), "- Warm-up 15m " + PACE.easy + "\n" + repeat("Main set", 6, ["- 800mtr " + PACE.cruise, "- 2m " + PACE.jog]) + "- Cool-down 10m " + PACE.easy);
+  const R6 = () => W(S("run", "Run — hill reps", "8 × 45 s · Z4–5", [
     { label: "Warm-up", text: "12 min easy on gentle ground." },
     { label: "Main", text: "8 × 45 s hard uphill, jog or walk down to recover. Tall, powerful posture — strength you can't get on the flat." },
     { label: "Cool-down", text: "10 min easy." }
-  ]);
+  ]), "- Warm-up 12m " + PACE.easy + "\n" + repeat("Hills", 8, ["- Hard uphill 45s Z4-Z5 HR", "- Jog down 90s Z1-Z2 HR"]) + "- Cool-down 10m " + PACE.easy);
 
   // ---------- unified run framework (Runna-style) ----------
   // 3 runs every week, today → end of May: one QUALITY (rotating hills / tempo /
@@ -175,7 +224,7 @@
     4: { tue: R5(), sat: LONG_BIKE("Long ride · 65 km + brick", "Z2 + 15′ run (big week)", [{ label: "Main", text: "65 km Zone 2 — your longest so far. Fuel every 30–40 min." }, BRICK("15 min")]), sun: LONG_RUN("18 km", "Peak long run — keep it genuinely easy.") },
     6: { tue: R4("2 × 10 min"), sat: LONG_BIKE("Long ride · 60 km", "tempo blocks + brick", [{ label: "Main", text: "60 km with 2–3 × 10 min at sweet-spot (25–28 km/h) mixed in." }, BRICK("15 min")]), sun: LONG_RUN("16 km", "Final 5 km steady (9.7–10.1 km/h).") },
     7: { tue: R3("4 × 1.5 km"), sat: LONG_BIKE("Long ride · 70 km + brick", "Z2 · peak ride", [{ label: "Main", text: "70 km Zone 2 — the peak ride. Practise full race fuelling & hydration." }, BRICK("20 min")]), sun: LONG_RUN("18 km", "Last 5 km at 70.3 run effort (9.7–10.1 km/h).") },
-    8: { tue: S("run", "Run — sharpener", "5 × 2 min · Z5", [{ label: "Warm-up", text: "12 min easy + strides." }, { label: "Main", text: "5 × 2 min @ 5K effort (11.6–12.2 km/h), 2 min jog. Short & sharp — keeps the legs quick." }, { label: "Cool-down", text: "8 min easy." }]), sat: LONG_BIKE("Ride · 45 km easy", "easy + a few surges", [{ label: "Main", text: "45 km easy with 4–5 × 30 s brisk surges to stay sharp." }]), sun: LONG_RUN("12 km", "Easy — legs should feel fresh, not worked.") }
+    8: { tue: W(S("run", "Run — sharpener", "5 × 2 min · Z5", [{ label: "Warm-up", text: "12 min easy + strides." }, { label: "Main", text: "5 × 2 min @ 5K effort (11.6–12.2 km/h), 2 min jog. Short & sharp — keeps the legs quick." }, { label: "Cool-down", text: "8 min easy." }]), "- Warm-up 12m " + PACE.easy + "\n" + repeat("Main set", 5, ["- 2m " + PACE.vo2, "- 2m " + PACE.jog]) + "- Cool-down 8m " + PACE.easy), sat: LONG_BIKE("Ride · 45 km easy", "easy + a few surges", [{ label: "Main", text: "45 km easy with 4–5 × 30 s brisk surges to stay sharp." }]), sun: LONG_RUN("12 km", "Easy — legs should feel fresh, not worked.") }
   };
 
   // ---------- phase resolver ----------
@@ -254,7 +303,7 @@
     const t = [
       [REST()],
       [run.quality, LOWER()],
-      [SWIM_S1("winter technique project"), UPPER()],
+      [bi % 6 === 0 ? SWIM_S2() : SWIM_S1("winter technique project"), UPPER()],
       [run.easy, SWIM_S3()],
       [BIKE_B1("Bike — endurance", "60–75 min Z2")],
       [LONG_BIKE("Long ride · " + bikeKm + " km", "Z2 easy", [{ label: "Main", text: "Almost all Zone 2 — building the aerobic engine. Cadence 85–95." }])],
@@ -273,8 +322,9 @@
     const t = [
       [REST()],
       [run.quality, LOWER()],
-      [SWIM_S1("+ open-water skills from spring"), UPPER()],
-      [run.easy, S("swim", "Swim — endurance", swimReps + " × 200 m @ CSS", [{ label: "Main", text: swimReps + " × 200 m @ CSS + 3–5 s, @ :20 — building toward the 1.9 km race distance." }, { label: "Then", text: "4 × 100 m pull, smooth. Cool-down 200 m." }])],
+      [bi % 6 === 3 ? SWIM_S2() : SWIM_S1("+ open-water skills from spring"), UPPER()],
+      [run.easy, W(S("swim", "Swim — endurance", swimReps + " × 200 m @ CSS", [{ label: "Main", text: swimReps + " × 200 m @ CSS + 3–5 s, @ :20 — building toward the 1.9 km race distance." }, { label: "Then", text: "4 × 100 m pull, smooth. Cool-down 200 m." }]),
+        "- Warm-up 300mtr\n" + repeat("Main", swimReps, ["- 200mtr %CSS+4%"]) + repeat("Pull", 4, ["- 100mtr"]) + "- Cool-down 200mtr")],
       [BIKE_B1("Bike — endurance", "75–90 min Z2")],
       [LONG_BIKE("Race brick · " + bikeKm + " km + " + brick + "′ run", "key 70.3 session", [{ label: "Bike", text: bikeKm + " km building toward 90 km, mostly Z2 with sweet-spot blocks." }, { label: "Fuel", text: "Rehearse race nutrition: 60–90 g carbs/hour." }, BRICK(brick + " min at 70.3 pace (Z3, ~9.7–10.1 km/h)")])],
       [run.long]
@@ -387,8 +437,36 @@
     return isoStr > RACE_703 ? "post" : "pre";
   }
 
+  // ---------- a session as watch workouts ----------
+  // What gets pushed to intervals.icu (and from there to her Garmin). Strength,
+  // mobility, rest and race day stay off the watch. cssSec is her CSS in seconds
+  // per 100 m; without it swims still go over, just without pace targets.
+  const SPORT = { run: "Run", bike: "Ride", swim: "Swim" };
+  function fmtPace(sec) { sec = Math.round(sec); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
+  // `near` is the session's date: a swapped day is a saved copy that may predate
+  // watch steps, so look the same session up in the plan around that date.
+  function watchWorkouts(s, cssSec, near) {
+    if (s && !s.ws && near && SPORT[s.type]) {
+      for (let k = -28; k <= 28 && !s.ws; k++) {
+        getDay(addDays(near, k)).sessions.forEach(x => {
+          if (!s.ws && x.ws && x.type === s.type && x.title === s.title && x.sub === s.sub) s = Object.assign({}, s, { ws: x.ws, wsBrick: x.wsBrick });
+        });
+      }
+    }
+    if (!s || !s.ws || !SPORT[s.type]) return [];
+    const fill = txt => txt.replace(/ ?%CSS(?:\+(\d+))?%/g, (m, plus) => {
+      if (!cssSec) return "";
+      const c = cssSec + (plus ? Number(plus) : 0);
+      return " " + fmtPace(c - 1) + "/100m-" + fmtPace(c + 2) + "/100m Pace";
+    });
+    const tidy = txt => txt.replace(/\n{3,}/g, "\n\n").trim();
+    const out = [{ suffix: "", type: SPORT[s.type], name: s.title.replace(/^🏁 /, ""), description: tidy(fill(s.ws)) }];
+    if (s.wsBrick) out.push({ suffix: "-brick", type: "Run", name: "Brick run — straight off the bike", description: tidy(s.wsBrick) });
+    return out;
+  }
+
   const TP = {
-    PLAN_START, RACE_703, DOLOMITES, BLOCKS, currentBlock,
+    PLAN_START, RACE_703, DOLOMITES, BLOCKS, currentBlock, watchWorkouts, fmtPace,
     getDay, addDays, daysBetween, parse, iso, weekdayMon0, intensityOf,
     TYPE_META: {
       run:      { label: "Run",      color: "#B0603A" },

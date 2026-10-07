@@ -24,7 +24,7 @@
   const $ = id => document.getElementById(id);
 
   // ---------- state ----------
-  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {}, imported: d.imported || {}, reviews: d.reviews || {} }; }
+  function normalize(d) { d = d || {}; return { done: d.done || {}, notes: d.notes || {}, overrides: d.overrides || {}, imported: d.imported || {}, reviews: d.reviews || {}, css: d.css || null }; }
   function loadLocal() { try { return normalize(JSON.parse(localStorage.getItem(LOCAL_KEY))); } catch (e) { return normalize(); } }
   function saveLocal() { try { localStorage.setItem(LOCAL_KEY, JSON.stringify(state)); } catch (e) { /* private mode */ } }
   let state = loadLocal();
@@ -85,7 +85,7 @@
   }
   function rerenderAll() {
     relink();      // a swap or a realtime update can change which session each workout belongs to
-    renderToday(); renderReview(); renderUpNext(); recomputeStats(); renderPlan();
+    renderToday(); renderReview(); renderUpNext(); recomputeStats(); renderPlan(); renderProgress();
     if (drawer.classList.contains("open") && currentIso) openDrawer(currentIso, { keepScroll: true });
   }
 
@@ -133,7 +133,6 @@
   const RACE_LEGS = ["swim", "bike", "run"];
   let acts = [];                       // newest first, as intervals.icu returns them
   let links = { bySession: {}, byAct: {}, extrasByDay: {} };
-  let wellnessLast = null;             // newest day carrying sleep/HRV, for the stale notice
   try { acts = JSON.parse(localStorage.getItem(ACTS_KEY)) || []; } catch (e) { acts = []; }
 
   const actIso = a => String(a.start_local || "").slice(0, 10);
@@ -206,7 +205,7 @@
   const extrasOn = iso => links.extrasByDay[iso] || [];
   function stripFor(iso, idx) {
     const l = linkedTo(iso, idx);
-    return l.length ? actualStrip(l, links.byAct[l[0].id].how) : "";
+    return l.length ? actualStrip(l, links.byAct[l[0].id].how, sessionsOfDay(iso)[idx]) : "";
   }
 
   // Pull everything since well before the plan started — the extra history
@@ -228,6 +227,7 @@
       const res = autoTick(), n = res.ticked;
       if (res.changed) persist();
       rerenderAll();
+      detectCss();
       setSyncBtn("idle", true);
       const fresh = Math.max(0, acts.length - before);
       if (n) toast("✓ " + n + " session" + (n > 1 ? "s" : "") + " ticked off from Garmin");
@@ -244,6 +244,12 @@
     const m = Math.round(s / 60);
     return m < 60 ? m + " min" : Math.floor(m / 60) + "h " + String(m % 60).padStart(2, "0") + "m";
   }
+  // 56:12 or 1:54:20 — a stopwatch reading, for a single workout
+  function fmtClock(s) {
+    s = Math.round(s || 0);
+    const h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = String(s % 60).padStart(2, "0");
+    return h ? h + ":" + String(m).padStart(2, "0") + ":" + x : m + ":" + x;
+  }
   function fmtKm(m) { return m >= 100000 ? Math.round(m / 1000) + " km" : (m / 1000).toFixed(1) + " km"; }
   function fmtDist(a) {
     if (!a.distance_m) return "";
@@ -252,41 +258,93 @@
   function fmtPace(a) {
     const d = a.distance_m, s = a.moving_s, t = actType(a);
     if (!d || !s) return "";
-    const mmss = x => Math.floor(x / 60) + ":" + String(Math.round(x % 60)).padStart(2, "0");
-    if (t === "run") return mmss(s / (d / 1000)) + " /km";
-    if (t === "swim") return mmss(s / (d / 100)) + " /100m";
+    if (t === "run") return TP.fmtPace(s / (d / 1000)) + " /km";
+    if (t === "swim") return TP.fmtPace(s / (d / 100)) + " /100m";
     if (t === "bike") return (d / 1000 / (s / 3600)).toFixed(1) + " km/h";
     return "";
   }
-  function actStats(a) { return [fmtDist(a), fmtDur(a.moving_s), fmtPace(a), a.avg_hr ? "♥ " + Math.round(a.avg_hr) : ""].filter(Boolean); }
+  function actStats(a) { return [fmtDist(a), fmtDur(a.moving_s), fmtPace(a), a.avg_hr ? Math.round(a.avg_hr) + " bpm" : ""].filter(Boolean); }
   function actLabel(a) {
     const t = actType(a);
     return t === "other" ? String(a.type || "Workout").replace(/([a-z])([A-Z])/g, "$1 $2") : meta(t).label;
   }
+  function joinAnd(xs) { return xs.length < 2 ? xs.join("") : xs.slice(0, -1).join(", ") + " and " + xs[xs.length - 1]; }
+  function ago(ms) {
+    const m = Math.round((Date.now() - ms) / 60000);
+    return m < 1 ? "just now" : m < 60 ? m + " min ago" : m < 24 * 60 ? Math.round(m / 60) + "h ago" : Math.round(m / 1440) + "d ago";
+  }
 
-  // What she actually did, shown under a planned session.
-  function actualStrip(list, how) {
+  // The four numbers that describe a workout, as value / unit / label.
+  function metricGrid(a) {
+    const t = actType(a), cells = [];
+    if (a.distance_m) cells.push(t === "swim" ? [Math.round(a.distance_m).toLocaleString("en-GB"), "m", "distance"] : [(a.distance_m / 1000).toFixed(1), "km", "distance"]);
+    if (a.moving_s) cells.push([fmtClock(a.moving_s), "", "time"]);
+    const p = fmtPace(a);
+    if (p) { const i = p.indexOf(" "); cells.push([p.slice(0, i), p.slice(i + 1), t === "bike" ? "speed" : "pace"]); }
+    if (a.avg_hr) cells.push([Math.round(a.avg_hr), "bpm", "avg HR"]);
+    return '<div class="mgrid">' + cells.map(c => '<div class="mg"><b>' + esc(c[0]) + (c[1] ? '<small>' + esc(c[1]) + '</small>' : '') + '</b><span>' + c[2] + '</span></div>').join("") + '</div>';
+  }
+
+  // ---------- planned vs actual ----------
+  // How much of the workout sat where the plan asked. Plan zones are the
+  // five-zone kind; intervals.icu splits Z5 into three, so "Z5" in the plan
+  // means its Z5 and up. Easy days count everything at or below the target
+  // (Z1 is fine on a Z2 day); hard days count everything at or above it — the
+  // warm-up and cool-down are in the total, hence the lower bar for "good".
+  // Swims are skipped: wrist HR in water isn't worth judging.
+  const sum = xs => xs.reduce((a, b) => a + b, 0);
+  function zoneCheck(s, list) {
+    if (!s || s.type === "swim" || s.type === "race" || s.type === "strength") return null;
+    const m = ((s.sub || "") + " " + (s.title || "")).match(/Z(\d)(?:\s*[–-]\s*Z?(\d))?/);
+    if (!m) return null;
+    const lo = Number(m[1]), hi = m[2] ? Number(m[2]) : lo;
+    const z = [0, 0, 0, 0, 0, 0, 0];
+    list.forEach(a => (a.hr_zone_times || []).forEach((sec, i) => { if (i < 7) z[i] += sec || 0; }));
+    const total = sum(z);
+    if (total < 300) return null;
+    const easy = hi <= 2;
+    const pct = Math.round((easy ? sum(z.slice(0, hi)) : sum(z.slice(lo - 1))) / total * 100);
+    const verb = s.type === "bike" ? "Rode" : "Ran";
+    let level, text;
+    if (easy) {
+      level = pct >= 70 ? "good" : pct >= 40 ? "mid" : "low";
+      text = (pct >= 70 ? "Kept it easy" : pct >= 40 ? "Mostly easy" : verb + " too hard for an easy day") + " · " + pct + "% in Zone " + (hi === 1 ? "1" : "1–" + hi);
+    } else {
+      level = pct >= 30 ? "good" : pct >= 15 ? "mid" : "low";
+      text = (pct >= 30 ? "Hit the effort" : pct >= 15 ? "Some quality" : "Stayed easy") + " · " + pct + "% in Zone " + lo + "+";
+    }
+    return { level: level, text: text, z: z, total: total };
+  }
+  // one hue, light to dark as the zones climb; each segment says its zone on hover
+  function zoneBar(zc, acc) {
+    return '<div class="zbar" style="--acc:' + acc + '">' + zc.z.map((sec, i) => sec
+      ? '<i class="z' + (i + 1) + '" style="flex:' + sec + '" title="Zone ' + (i + 1) + ' · ' + fmtDur(sec) + '"></i>' : "").join("") + '</div>';
+  }
+
+  // What she actually did, under a planned session.
+  function actualStrip(list, how, s) {
     if (!list.length) return "";
-    const first = list[0], moved = how === "moved";
-    const head = moved ? "Done " + relDay(actIso(first)).replace(/^(Today|Yesterday|Tomorrow)$/, s => s.toLowerCase()) + " instead" : "From your watch";
+    const zc = zoneCheck(s, list);
+    const head = how === "moved" ? "Done " + DOW_FULL[TP.weekdayMon0(actIso(list[0]))] + " instead" : "From your watch";
     return '<div class="actual">' +
-      '<div class="act-head"><span class="act-src">⌚ ' + esc(head) + '</span></div>' +
-      list.map(a => '<div class="act-line">' +
-        (list.length > 1 ? '<span class="act-ic">' + (ICONS[actType(a)] || "•") + '</span>' : '') +
-        pills(actStats(a), col(actType(a))) + '</div>').join("") +
+      '<div class="act-head">' + esc(head) + '</div>' +
+      list.map(a => (list.length > 1 ? '<div class="act-sub">' + (ICONS[actType(a)] || "•") + " " + esc(actLabel(a)) + '</div>' : '') + metricGrid(a)).join("") +
+      (zc ? '<div class="zc ' + zc.level + '">' + zoneBar(zc, s ? col(s.type) : "var(--ink)") +
+        '<div class="zc-t"><i class="zc-dot"></i>' + esc(zc.text) + '</div></div>' : '') +
     '</div>';
   }
 
-  // A recorded workout as a list row — used for extras and the latest feed.
+  // A recorded workout as a list row — the latest feed and the extras.
   function actRow(a, showDay) {
     const t = actType(a), m = links.byAct[a.id];
     const s = m ? sessionsOfDay(m.key.split(":")[0])[Number(m.key.split(":")[1])] : null;
-    const tag = s ? '<span class="pill act-tag ok">✓ ' + esc(shortTitle(s.title)) + '</span>' : '<span class="pill act-tag">Extra</span>';
+    const tag = s ? '<span class="tag ok">✓ ' + esc(shortTitle(s.title)) + '</span>' : '<span class="tag">Extra</span>';
+    const d = TP.parse(actIso(a));
     return '<div class="row act-row" data-iso="' + actIso(a) + '"' + (showDay ? ' data-open role="button" tabindex="0"' : '') + '>' +
       '<span class="row-icon" style="background:color-mix(in srgb,' + col(t) + ' 16%, transparent)">' + (ICONS[t] || "⚡") + '</span>' +
       '<span class="row-main"><span class="row-title">' + esc(a.name || actLabel(a)) + '</span>' +
-      pills(actStats(a), col(t), showDay ? [tag] : []) + '</span>' +
-      (showDay ? '<span class="row-end"><b>' + relDay(actIso(a)) + '</b><span class="date-pill">' + TP.parse(actIso(a)).getDate() + ' ' + MON_ABBR[TP.parse(actIso(a)).getMonth()] + '</span></span>' + CHEV_SVG : '') +
+      '<span class="row-sub">' + esc(actStats(a).slice(0, 3).join(" · ")) + '</span>' + (showDay ? tag : '') + '</span>' +
+      (showDay ? '<span class="row-end"><b>' + relDay(actIso(a)) + '</b><span class="row-date">' + d.getDate() + ' ' + MON_ABBR[d.getMonth()] + '</span></span>' + CHEV_SVG : '') +
     '</div>';
   }
 
@@ -341,7 +399,7 @@
   // Workout steps: label pill (Warm-up, Main…) over readable body text.
   function steps(blocks, acc) {
     return '<div class="steps" style="--acc:' + acc + '">' + blocks.map(b =>
-      '<div class="step"><span class="step-l">' + esc(b.label) + '</span><div class="step-t">' + esc(b.text) + '</div></div>').join("") + '</div>';
+      '<div class="step"><span class="step-l">' + esc(b.label) + '</span><div class="step-t">' + esc(cssify(b.text)) + '</div></div>').join("") + '</div>';
   }
 
   function relDay(iso) {
@@ -373,33 +431,103 @@
     return TP.RACE_703 >= today ? { iso: TP.RACE_703, name: "Ironman 70.3", from: TP.PLAN_START } : null;
   }
 
+  // ---------- readiness ----------
+  // Last night's sleep, HRV and resting HR against her own four-week normal,
+  // plus training form. Conservative: a number that isn't there never counts
+  // against her, and sleep that hasn't synced yet just shows a dash.
+  let wellness = [];
+  function mean(xs) { return xs.length ? sum(xs) / xs.length : null; }
+  function readiness() {
+    const days = wellness.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+    const latest = days[days.length - 1] || null;
+    const fresh = !!latest && TP.daysBetween(latest.date, today) <= 1;
+    const prior = latest ? days.filter(d => d.date < latest.date).slice(-28) : [];
+    const base = k => mean(prior.map(d => d[k]).filter(v => typeof v === "number"));
+    const r = { latest: latest, fresh: fresh, hrvBase: base("hrv"), rhrBase: base("resting_hr"), flags: [] };
+    r.hrv = fresh && typeof latest.hrv === "number" ? latest.hrv : null;
+    r.rhr = fresh && typeof latest.resting_hr === "number" ? latest.resting_hr : null;
+    r.sleepH = fresh && latest.sleep_s ? latest.sleep_s / 3600 : null;
+    r.sleepScore = fresh ? latest.sleep_score : null;
+    if (r.sleepH !== null && r.sleepH < 6) r.flags.push("short sleep");
+    if (r.hrv !== null && r.hrvBase && r.hrv < r.hrvBase * 0.92) r.flags.push("HRV is below your normal");
+    if (r.rhr !== null && r.rhrBase && r.rhr > r.rhrBase + 3) r.flags.push("resting HR is up");
+    const series = loadSeries();
+    r.form = series.length >= 14 ? series[series.length - 1] : null;
+    r.fr = r.form ? formRead(r.form.ctl, r.form.form) : null;
+    if (r.fr && r.fr.label === "Overreaching") r.flags.push("training load is high");
+
+    if (r.flags.length >= 2) { r.level = "low"; r.head = "Take it easy today"; r.note = "Your body's asking for a lighter day — " + joinAnd(r.flags) + "."; }
+    else if (r.flags.length === 1) { r.level = "mid"; r.head = "Steady does it"; r.note = "Mostly fine, but " + r.flags[0] + ". Start easy and see how you feel."; }
+    else if (fresh) { r.level = "good"; r.head = "Good to go"; r.note = "Sleep and HRV look normal for you — train as planned."; }
+    else if (r.fr) { r.level = r.fr.cls; r.head = r.fr.label; r.note = r.fr.note; }
+    else { r.level = "none"; r.head = "One session at a time"; r.note = ""; }
+    if (latest && !fresh && TP.daysBetween(latest.date, today) > 3) r.note += (r.note ? " " : "") + "Sleep & HRV last synced " + prettyDate(latest.date) + ".";
+    return r;
+  }
+
   function renderHero() {
     const day = dayOf(today), dt = TP.parse(today), h = new Date().getHours();
     $("greeting").textContent = (h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening") + ", Harriet";
     $("heroDate").textContent = day.dayName + " " + dt.getDate() + " " + MONTHS[dt.getMonth()];
-    $("heroPhase").textContent = day.phase.label;
-    $("heroDay").textContent = day.weekNum ? "Week " + day.weekNum : "";
+    $("heroPhase").textContent = day.phase.label + (day.weekNum ? " · Week " + day.weekNum : "");
+    const race = nextRaceInfo();
+    $("heroCountdown").textContent = race ? TP.daysBetween(today, race.iso) : "🎉";
 
-    // tint the hero to the day's dominant discipline
-    const real = sessionsOfDay(today).filter(s => s.type !== "rest");
-    $("hero").setAttribute("data-lead", real.length ? real[0].type : "rest");
+    const r = readiness();
+    $("hero").setAttribute("data-level", r.level);
+    $("heroHead").textContent = r.head;
+    $("heroNote").textContent = r.note;
 
-    const r = nextRaceInfo(), ring = $("hcFill"), C = 2 * Math.PI * 52;
-    ring.style.strokeDasharray = C;
-    if (r) {
-      const left = TP.daysBetween(today, r.iso);
-      const span = Math.max(1, TP.daysBetween(r.from, r.iso));
-      const gone = Math.min(1, Math.max(0, TP.daysBetween(r.from, today) / span));
-      $("heroCountdown").textContent = left;
-      $("heroCountLabel").textContent = left === 0 ? "Race day — " + r.name + "!" : "to " + r.name;
-      $("heroCountSub").textContent = Math.round(gone * 100) + "% of the journey done · " + prettyDate(r.iso, true);
-      ring.style.strokeDashoffset = C * (1 - gone);
-    } else {
-      $("heroCountdown").textContent = "🎉";
-      $("heroCountLabel").textContent = "Season complete";
-      $("heroCountSub").textContent = "What a year.";
-      ring.style.strokeDashoffset = 0;
+    // "usual 61" beside the number says the comparison in the fewest words
+    const delta = (v, b, lowerIsBetter) => {
+      if (v === null || !b) return ["", ""];
+      const better = lowerIsBetter ? v <= b + 1 : v >= b * 0.97;
+      return ["usual " + Math.round(b), better ? "ok" : "warn"];
+    };
+    const cell = (label, val, unit, sub) => '<div class="hm"><span class="hm-l">' + label + '</span>' +
+      '<b>' + val + (unit && val !== "—" ? '<small>' + unit + '</small>' : '') + '</b><span class="hm-s ' + (sub[1] || "") + '">' + (sub[0] || "&nbsp;") + '</span></div>';
+    $("heroMetrics").innerHTML =
+      cell("Sleep", r.sleepH !== null ? r.sleepH.toFixed(1) : "—", "h", [r.sleepScore ? "score " + r.sleepScore : (r.fresh ? "not in yet" : ""), ""]) +
+      cell("HRV", r.hrv !== null ? Math.round(r.hrv) : "—", "ms", delta(r.hrv, r.hrvBase, false)) +
+      cell("Resting HR", r.rhr !== null ? r.rhr : "—", "bpm", delta(r.rhr, r.rhrBase, true)) +
+      cell("Form", r.form ? (r.form.form > 0 ? "+" : "") + Math.round(r.form.form) : "—", "", [r.fr ? r.fr.label : "", ""]);
+    renderSuggestion(r);
+  }
+
+  // When the body says "easy" and today is a hard day, offer to swap it with
+  // the gentlest day left this week (a rest day is the best swap of all).
+  function isHard(s) { return s.type !== "race" && (TP.intensityOf(s) === "hard" || /long|brick/i.test(s.title)); }
+  function swapCandidate() {
+    const ss = sessionsOfDay(today);
+    const hard = ss.filter((s, i) => !state.done[keyFor(today, i)] && isHard(s))[0];
+    if (!hard) return null;
+    const sunday = TP.addDays(mondayOf(today), 6);
+    for (let d = TP.addDays(today, 1); d <= sunday; d = TP.addDays(d, 1)) {
+      const ds = sessionsOfDay(d);
+      if (!ds.length || ds.some(x => x.type === "race" || isHard(x)) || ds.some((x, i) => state.done[keyFor(d, i)])) continue;
+      return { hard: hard, day: d, sessions: ds };
     }
+    return null;
+  }
+  function renderSuggestion(r) {
+    const el = $("heroSugg");
+    let dismissed = false; try { dismissed = localStorage.getItem("htp_sugg") === today; } catch (e) { /* ignore */ }
+    const c = r.level === "low" && !dismissed ? swapCandidate() : null;
+    if (!c) { el.hidden = true; el.innerHTML = ""; return; }
+    const real = c.sessions.filter(x => x.type !== "rest");
+    const what = real.length ? real.map(x => shortTitle(x.title).toLowerCase()).join(" + ") : "rest day";
+    el.innerHTML = '<p>Your ' + esc(shortTitle(c.hard.title).toLowerCase()) + ' can wait. Swap today with ' +
+      DOW_FULL[TP.weekdayMon0(c.day)] + '’s ' + esc(what) + '?</p>' +
+      '<div class="hs-btns"><button class="hs-yes">Swap the days</button><button class="hs-no">Keep the plan</button></div>';
+    el.hidden = false;
+    el.querySelector(".hs-yes").addEventListener("click", () => { if (ensureEdit(() => swapDays(today, c.day))) swapDays(today, c.day); });
+    el.querySelector(".hs-no").addEventListener("click", () => { try { localStorage.setItem("htp_sugg", today); } catch (e) { /* ignore */ } el.hidden = true; });
+  }
+
+  // the one instruction that matters, so the card stays short
+  function mainStep(s) {
+    const b = (s.blocks || []).filter(x => x.label === "Main")[0] || (s.blocks || [])[0];
+    return b ? b.text : "";
   }
 
   function renderTodaySessions() {
@@ -417,44 +545,46 @@
     }
 
     wrap.innerHTML = sessions.map((s, idx) => {
-      const isRest = s.type === "rest", done = !!state.done[keyFor(today, idx)];
-      const blocks = (s.blocks || []).length ? steps(s.blocks.slice(0, 3), col(s.type)) : "";
+      const isRest = s.type === "rest", done = !!state.done[keyFor(today, idx)], strip = stripFor(today, idx);
+      const main = isRest ? "" : mainStep(s);
       return '<article class="tcard card' + (done ? " done" : "") + (isRest ? " t-rest" : "") + '" style="--acc:' + col(s.type) + '">' +
         '<div class="tc-top">' +
           '<div class="tc-badge">' + (ICONS[s.type] || "•") + '</div>' +
-          '<div class="tc-meta">' +
-            '<div class="tc-type">' + meta(s.type).label + '</div>' +
-            '<h3>' + esc(s.title) + '</h3>' +
-            pills(s.sub, col(s.type)) +
-          '</div>' +
+          '<div class="tc-meta"><div class="tc-type">' + meta(s.type).label + '</div><h3>' + esc(s.title) + '</h3>' + pills(s.sub, col(s.type)) + '</div>' +
+          (isRest ? '' : '<button class="check-hit tc-tick" data-idx="' + idx + '" aria-label="' + (done ? "Done — tap to undo" : "Mark as done") + '"><span class="check lg' + (done ? " on" : "") + '">' + CHECK_SVG + '</span></button>') +
         '</div>' +
-        stripFor(today, idx) +
-        blocks +
-        '<div class="tc-actions">' +
-          (isRest ? '' : '<button class="tcard-btn tc-tick' + (done ? " on" : "") + '" data-idx="' + idx + '">' +
-            (done ? '<svg class="ck" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>Done' : 'Mark as done') + '</button>') +
-          '<button class="tcard-btn tc-more">' + (isRest ? "See the plan for today" : "Workout") + '</button>' +
-        '</div>' +
+        (main && !strip ? '<p class="tc-main">' + esc(cssify(main)) + '</p>' : '') +
+        strip +
+        '<button class="tc-more">' + (isRest ? "Why rest matters" : "Full workout") + CHEV_SVG + '</button>' +
       '</article>';
     }).join("");
 
     const extra = extrasOn(today);
-    if (extra.length) {
-      wrap.innerHTML += '<div class="card list extras"><div class="list-cap">Also on your watch today</div>' + extra.map(a => actRow(a, false)).join("") + '</div>';
-    }
+    if (extra.length) wrap.innerHTML += '<div class="card list extras"><div class="list-cap">Also on your watch today</div>' + extra.map(a => actRow(a, false)).join("") + '</div>';
 
     wrap.querySelectorAll(".tc-tick").forEach(b => b.addEventListener("click", () => {
       if (tick(today, Number(b.getAttribute("data-idx")))) {
-        const nb = wrap.querySelector('.tc-tick[data-idx="' + b.getAttribute("data-idx") + '"]');
+        const nb = wrap.querySelector('.tc-tick[data-idx="' + b.getAttribute("data-idx") + '"] .check');
         if (nb) nb.classList.add("pop");
       }
     }));
     wrap.querySelectorAll(".tc-more").forEach(b => b.addEventListener("click", () => openDrawer(today)));
   }
 
-  function renderRhythm() {
-    const el = $("rhythm");
-    const monday = mondayOf(anchorDay);
+  function sumWeek(monday) {
+    const end = TP.addDays(monday, 6), out = { swim: 0, bike: 0, run: 0, secs: 0, n: 0 };
+    acts.forEach(a => {
+      const d = actIso(a); if (d < monday || d > end) return;
+      const t = actType(a);
+      if (out[t] !== undefined) out[t] += a.distance_m || 0;
+      out.secs += a.moving_s || 0; out.n++;
+    });
+    return out;
+  }
+  const swimTxt = m => m >= 1000 ? (m / 1000).toFixed(1) + " km" : Math.round(m) + " m";
+
+  function renderWeek() {
+    const el = $("rhythm"), monday = mondayOf(anchorDay);
     let done = 0, total = 0, html = "";
     for (let i = 0; i < 7; i++) {
       const d = TP.addDays(monday, i), dt = TP.parse(d);
@@ -468,65 +598,37 @@
         ? real.slice(0, 3).map(x => '<i style="background:' + col(x.type) + '"></i>').join("")
         : (xs ? "" : '<i class="rest-dot"></i>')) + xs;
       html += '<button class="rh-day ' + st + (d === today ? " is-today" : "") + '" data-iso="' + d + '" aria-label="' + DOW_FULL[i] + " " + dt.getDate() + '">' +
-        '<span class="rh-dow">' + DOW[i][0] + '</span>' +
-        '<span class="rh-num">' + dt.getDate() + '</span>' +
-        '<span class="rh-dots">' + dots + '</span>' +
-      '</button>';
+        '<span class="rh-dow">' + DOW[i][0] + '</span><span class="rh-num">' + dt.getDate() + '</span><span class="rh-dots">' + dots + '</span></button>';
     }
     el.innerHTML = html;
     el.querySelectorAll(".rh-day").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
-    $("rhythmLabel").textContent = total ? done + " / " + total + " sessions" : "";
+    $("rhythmLabel").textContent = total ? done + " of " + total + " done" : "";
+
+    // what the watch recorded this week — hidden until there's anything to show
+    const wk = sumWeek(monday), vol = $("weekVol");
+    vol.hidden = !wk.n;
+    const v = (type, label, val) => '<div class="wv"><span class="wv-l"><i class="dot" style="background:' + col(type) + '"></i>' + label + '</span><b>' + val + '</b></div>';
+    vol.innerHTML = v("swim", "Swim", swimTxt(wk.swim)) + v("bike", "Bike", Math.round(wk.bike / 1000) + " km") +
+      v("run", "Run", (wk.run / 1000).toFixed(1) + " km") + v("rest", "Time", fmtDur(wk.secs) || "0 min");
   }
 
-  function renderToday() { renderHero(); renderTodaySessions(); renderRhythm(); renderWatch(); }
-
-  // ---------- TODAY: from your watch ----------
-  function sumWeek(monday) {
-    const end = TP.addDays(monday, 6), out = { swim: 0, bike: 0, run: 0, secs: 0, n: 0 };
-    acts.forEach(a => {
-      const d = actIso(a); if (d < monday || d > end) return;
-      const t = actType(a);
-      if (out[t] !== undefined) out[t] += a.distance_m || 0;
-      out.secs += a.moving_s || 0; out.n++;
-    });
-    return out;
-  }
-
-  function renderWatch() {
-    const sec = $("watch");
-    if (!acts.length) { sec.hidden = true; return; }
-    sec.hidden = false;
-
+  function renderLatest() {
+    const sec = $("latest"), latest = acts.filter(a => actIso(a) >= TP.PLAN_START).slice(0, 4);
+    sec.hidden = !latest.length;
+    if (!latest.length) return;
     let at = 0; try { at = Number(localStorage.getItem(ACTS_AT_KEY)) || 0; } catch (e) { /* ignore */ }
-    const mins = at ? Math.round((Date.now() - at) / 60000) : null;
-    $("watchMeta").textContent = mins === null ? "" : mins < 1 ? "Updated just now" : mins < 60 ? "Updated " + mins + " min ago" : "Updated " + Math.round(mins / 60) + "h ago";
-
-    // this week's volume, with last week underneath for scale
-    const mon = mondayOf(anchorDay), wk = sumWeek(mon), lw = sumWeek(TP.addDays(mon, -7));
-    const tile = (type, label, val, prev) =>
-      '<div class="vol-t"><div class="vol-l"><i class="dot" style="background:' + col(type) + '"></i>' + label + '</div>' +
-      '<div class="vol-n">' + val + '</div><div class="vol-sub">last wk ' + prev + '</div></div>';
-    const swimTxt = m => m >= 1000 ? (m / 1000).toFixed(1) + " km" : Math.round(m) + " m";
-    $("weekVol").innerHTML =
-      tile("swim", "Swim", swimTxt(wk.swim), swimTxt(lw.swim)) +
-      tile("bike", "Bike", Math.round(wk.bike / 1000) + " km", Math.round(lw.bike / 1000) + " km") +
-      tile("run", "Run", (wk.run / 1000).toFixed(1) + " km", (lw.run / 1000).toFixed(1) + " km") +
-      tile("rest", "Time", fmtDur(wk.secs) || "0 min", fmtDur(lw.secs) || "0 min");
-
-    const latest = acts.filter(a => actIso(a) >= TP.PLAN_START).slice(0, 4);
-    $("latestActs").innerHTML = '<div class="list-cap">Latest workouts</div>' + latest.map(a => actRow(a, true)).join("");
+    $("watchMeta").textContent = at ? "Synced " + ago(at) : "";
+    $("latestActs").innerHTML = latest.map(a => actRow(a, true)).join("");
     wireRows($("latestActs"));
+  }
 
-    renderFitness();
+  function renderToday() { renderHero(); renderTodaySessions(); renderWeek(); renderLatest(); }
 
-    // sleep / HRV come through a separate Garmin permission — say so if it's gone quiet
-    const wn = $("wellnessNote");
-    const quietDays = wellnessLast ? TP.daysBetween(wellnessLast, today) : null;
-    if (quietDays !== null && quietDays > 3) {
-      wn.hidden = false;
-      wn.textContent = "Sleep & HRV haven't come through since " + prettyDate(wellnessLast) +
-        " — in Garmin Connect → Connected Apps → intervals.icu, make sure health data is allowed.";
-    } else wn.hidden = true;
+  // ---------- PROGRESS ----------
+  function renderProgress() {
+    if ($("view-progress").hidden) return;
+    $("progKicker").textContent = acts.length ? "Since " + prettyDate(TP.PLAN_START) : "From her watch";
+    renderFitness(); renderHours(); renderPredict(); renderRaceReady(); renderCss();
   }
 
   // ---------- fitness / fatigue / form ----------
@@ -561,29 +663,39 @@
     return { cls: "low", label: "Overreaching", note: "Fatigue is well ahead of fitness. Keep the next day or two genuinely easy." };
   }
 
-  let fitTimer = null;
   function renderFitness() {
     const card = $("fitness"), series = loadSeries();
     if (series.length < 14) { card.hidden = true; return; }
     card.hidden = false;
-    const now = series[series.length - 1];
-    const r = formRead(now.ctl, now.form);
-    const v = $("fitVerdict"); v.textContent = r.label; v.className = "rd-verdict " + r.cls;
+    const now = series[series.length - 1], r = formRead(now.ctl, now.form);
+    const v = $("fitVerdict"); v.textContent = r.label; v.className = "chip " + r.cls;
     $("fitCtl").textContent = Math.round(now.ctl);
+    const dc = Math.round(now.ctl - series[Math.max(0, series.length - 8)].ctl);
+    $("fitCtlSub").textContent = (dc > 0 ? "↑ " + dc : dc < 0 ? "↓ " + -dc : "→ 0") + " this week";
     $("fitAtl").textContent = Math.round(now.atl);
     $("fitForm").textContent = (now.form > 0 ? "+" : "") + Math.round(now.form);
-    const wkAgo = series[Math.max(0, series.length - 8)];
-    const dc = Math.round(now.ctl - wkAgo.ctl);
-    $("fitCtlSub").textContent = (dc > 0 ? "+" : "") + dc + " this week";
-    $("fitNote").textContent = r.note;
+    $("fitNote").textContent = r.note + " Fitness is your 6-week training average; fatigue is the last week; form is the gap.";
     drawFitness(series.slice(-84));
   }
 
+  // shared hover readout for the charts — built with textContent, never HTML
+  function chartTip(tip, lines, x, W) {
+    tip.textContent = "";
+    lines.forEach((l, i) => {
+      const d = document.createElement("div");
+      if (i === 0) { d.className = "tip-d"; d.textContent = l; }
+      else { const b = document.createElement("b"); b.textContent = l[0]; d.append(b, " " + l[1]); }
+      tip.appendChild(d);
+    });
+    tip.hidden = false;
+    tip.style.left = Math.max(0, Math.min(W - tip.offsetWidth, x - tip.offsetWidth / 2)) + "px";
+  }
+
   // One series (fitness) — a 2px line over a faint wash, end dot + value,
-  // crosshair tooltip carrying all three numbers for the day under the finger.
+  // crosshair readout with all three numbers for the day under the finger.
   function drawFitness(pts) {
     const box = $("fitChart");
-    const W = Math.max(240, box.clientWidth || 320), H = 132, padT = 14, padB = 20, padR = 34;
+    const W = Math.max(240, box.clientWidth || 320), H = 140, padT = 14, padB = 20, padR = 30;
     const iw = W - padR, ih = H - padT - padB;
     const maxV = Math.max(10, Math.ceil(Math.max.apply(null, pts.map(p => p.ctl)) * 1.2 / 10) * 10);
     const x = i => i / Math.max(1, pts.length - 1) * iw;
@@ -591,45 +703,146 @@
     const line = pts.map((p, i) => (i ? "L" : "M") + x(i).toFixed(1) + " " + y(p.ctl).toFixed(1)).join("");
     const area = line + "L" + x(pts.length - 1).toFixed(1) + " " + (padT + ih) + "L0 " + (padT + ih) + "Z";
     const grid = [0, maxV / 2, maxV].map(g =>
-      '<line class="fg" x1="0" x2="' + iw + '" y1="' + y(g) + '" y2="' + y(g) + '"/>' +
-      (g ? '<text class="ft" x="0" y="' + (y(g) - 4) + '">' + g + '</text>' : '')).join("");
+      '<line class="cg" x1="0" x2="' + iw + '" y1="' + y(g) + '" y2="' + y(g) + '"/>' +
+      (g ? '<text class="ct" x="0" y="' + (y(g) - 4) + '">' + g + '</text>' : '')).join("");
     const months = pts.map((p, i) => ({ p: p, i: i })).filter(o => o.p.iso.slice(8) === "01")
-      .map(o => '<text class="ft" x="' + x(o.i) + '" y="' + (H - 4) + '" text-anchor="middle">' + MON_ABBR[TP.parse(o.p.iso).getMonth()] + '</text>').join("");
+      .map(o => '<text class="ct" x="' + x(o.i) + '" y="' + (H - 4) + '" text-anchor="middle">' + MON_ABBR[TP.parse(o.p.iso).getMonth()] + '</text>').join("");
     const last = pts[pts.length - 1], lx = x(pts.length - 1), ly = y(last.ctl);
     box.innerHTML =
       '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Fitness over the last 12 weeks, now ' + Math.round(last.ctl) + '">' +
         grid + months +
-        '<path class="fa" d="' + area + '"/><path class="fl" d="' + line + '"/>' +
-        '<circle class="fd" cx="' + lx + '" cy="' + ly + '" r="4.5"/>' +
-        '<text class="fv" x="' + (lx + 8) + '" y="' + (ly + 4) + '">' + Math.round(last.ctl) + '</text>' +
-        '<line class="fx" id="fitX" x1="0" x2="0" y1="' + padT + '" y2="' + (padT + ih) + '" visibility="hidden"/>' +
-        '<circle class="fd" id="fitDot" r="4.5" visibility="hidden"/>' +
-        '<rect class="fhit" x="0" y="0" width="' + iw + '" height="' + H + '"/>' +
-      '</svg><div class="fit-tip" id="fitTip" hidden></div>';
-
-    const hit = box.querySelector(".fhit"), xl = $("fitX"), dot = $("fitDot"), tip = $("fitTip");
+        '<path class="ca" d="' + area + '"/><path class="cl" d="' + line + '"/>' +
+        '<circle class="cd" cx="' + lx + '" cy="' + ly + '" r="4.5"/>' +
+        '<text class="cv" x="' + (lx + 8) + '" y="' + (ly + 4) + '">' + Math.round(last.ctl) + '</text>' +
+        '<line class="cx" x1="0" x2="0" y1="' + padT + '" y2="' + (padT + ih) + '" visibility="hidden"/>' +
+        '<circle class="cd cdh" r="4.5" visibility="hidden"/>' +
+        '<rect class="chit" x="0" y="0" width="' + iw + '" height="' + H + '"/>' +
+      '</svg><div class="chart-tip" hidden></div>';
+    const hit = box.querySelector(".chit"), xl = box.querySelector(".cx"), dot = box.querySelector(".cdh"), tip = box.querySelector(".chart-tip");
     const show = e => {
       const rect = hit.getBoundingClientRect();
       const i = Math.max(0, Math.min(pts.length - 1, Math.round((e.clientX - rect.left) / rect.width * (pts.length - 1))));
-      const p = pts[i], px = x(i), py = y(p.ctl);
+      const p = pts[i], px = x(i);
       xl.setAttribute("x1", px); xl.setAttribute("x2", px); xl.setAttribute("visibility", "visible");
-      dot.setAttribute("cx", px); dot.setAttribute("cy", py); dot.setAttribute("visibility", "visible");
-      tip.textContent = "";
-      const row = (k, val, strong) => { const d = document.createElement("div"); const b = document.createElement(strong ? "b" : "span"); b.textContent = val; d.append(b, " " + k); tip.appendChild(d); };
-      const hd = document.createElement("div"); hd.className = "tip-d"; hd.textContent = DOW[TP.weekdayMon0(p.iso)] + " " + prettyDate(p.iso); tip.appendChild(hd);
-      row("fitness", String(Math.round(p.ctl)), true);
-      row("fatigue", String(Math.round(p.atl)));
-      row("form", (p.form > 0 ? "+" : "") + Math.round(p.form));
-      tip.hidden = false;
-      tip.style.left = Math.max(0, Math.min(W - tip.offsetWidth, px - tip.offsetWidth / 2)) + "px";
+      dot.setAttribute("cx", px); dot.setAttribute("cy", y(p.ctl)); dot.setAttribute("visibility", "visible");
+      chartTip(tip, [DOW[TP.weekdayMon0(p.iso)] + " " + prettyDate(p.iso), [String(Math.round(p.ctl)), "fitness"], [String(Math.round(p.atl)), "fatigue"], [(p.form > 0 ? "+" : "") + Math.round(p.form), "form"]], px, W);
     };
     const hide = () => { xl.setAttribute("visibility", "hidden"); dot.setAttribute("visibility", "hidden"); tip.hidden = true; };
-    hit.addEventListener("pointermove", show);
-    hit.addEventListener("pointerdown", show);
-    hit.addEventListener("pointerleave", hide);
-    hit.addEventListener("pointercancel", hide);
+    hit.addEventListener("pointermove", show); hit.addEventListener("pointerdown", show);
+    hit.addEventListener("pointerleave", hide); hit.addEventListener("pointercancel", hide);
   }
-  addEventListener("resize", () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { if (!$("fitness").hidden) renderFitness(); }, 150); });
+
+  // ---------- training time per week ----------
+  // Columns, one per week: this week in the accent, the rest recessive; each
+  // column's hover readout breaks the week down by discipline.
+  function renderHours() {
+    const card = $("hours");
+    if (!acts.length) { card.hidden = true; return; }
+    card.hidden = false;
+    const mon0 = mondayOf(today), weeks = [];
+    for (let i = 11; i >= 0; i--) { const m = TP.addDays(mon0, -7 * i); weeks.push(Object.assign({ monday: m }, sumWeek(m))); }
+    const cur = weeks[weeks.length - 1], prev = weeks[weeks.length - 2];
+    $("hoursNow").textContent = fmtDur(cur.secs) || "0 min";
+    $("hoursSub").textContent = "this week · " + (fmtDur(prev.secs) || "0 min") + " last week";
+
+    const box = $("hoursChart");
+    const W = Math.max(240, box.clientWidth || 320), H = 130, padT = 14, padB = 20;
+    const ih = H - padT - padB, slot = W / weeks.length, bw = Math.min(24, slot - 6);
+    const maxH = Math.max(2, Math.ceil(Math.max.apply(null, weeks.map(w => w.secs / 3600)) / 2) * 2);
+    const y = h => padT + ih - h / maxH * ih, base = padT + ih;
+    const bar = (x, top) => {
+      const r = Math.min(4, (base - top) / 2);
+      return "M" + x + " " + base + "V" + (top + r) + "Q" + x + " " + top + " " + (x + r) + " " + top + "H" + (x + bw - r) + "Q" + (x + bw) + " " + top + " " + (x + bw) + " " + (top + r) + "V" + base + "Z";
+    };
+    let marks = "", labels = "";
+    weeks.forEach((w, i) => {
+      const x = i * slot + (slot - bw) / 2, h = w.secs / 3600;
+      if (h > 0) marks += '<path class="' + (i === weeks.length - 1 ? "cb cur" : "cb") + '" d="' + bar(x, y(h)) + '"/>';
+      if (i % 3 === 2 || i === weeks.length - 1) {
+        const d = TP.parse(w.monday);
+        labels += '<text class="ct" x="' + (x + bw / 2) + '" y="' + (H - 4) + '" text-anchor="middle">' + (i === weeks.length - 1 ? "Now" : d.getDate() + " " + MON_ABBR[d.getMonth()]) + '</text>';
+      }
+    });
+    box.innerHTML = '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Training hours per week, last 12 weeks">' +
+      '<line class="cg" x1="0" x2="' + W + '" y1="' + base + '" y2="' + base + '"/>' +
+      '<line class="cg" x1="0" x2="' + W + '" y1="' + y(maxH) + '" y2="' + y(maxH) + '"/><text class="ct" x="0" y="' + (y(maxH) - 4) + '">' + maxH + 'h</text>' +
+      marks + labels +
+      weeks.map((w, i) => '<rect class="chit" data-i="' + i + '" x="' + (i * slot) + '" y="0" width="' + slot + '" height="' + H + '"/>').join("") +
+      '</svg><div class="chart-tip" hidden></div>';
+    const tip = box.querySelector(".chart-tip");
+    box.querySelectorAll(".chit").forEach(r => {
+      const show = () => {
+        const w = weeks[Number(r.getAttribute("data-i"))];
+        box.querySelectorAll(".cb").forEach(b => b.classList.remove("on"));
+        const lines = ["Week of " + prettyDate(w.monday), [fmtDur(w.secs) || "0 min", "training"]];
+        if (w.swim) lines.push([swimTxt(w.swim), "swim"]);
+        if (w.bike) lines.push([Math.round(w.bike / 1000) + " km", "bike"]);
+        if (w.run) lines.push([(w.run / 1000).toFixed(1) + " km", "run"]);
+        chartTip(tip, lines, Number(r.getAttribute("x")) + slot / 2, W);
+      };
+      r.addEventListener("pointerenter", show); r.addEventListener("pointerdown", show);
+      r.addEventListener("pointerleave", () => { tip.hidden = true; });
+    });
+  }
+
+  // ---------- 70.3 estimate ----------
+  // A rough finish time from what she's done in the last 8 weeks:
+  //   swim — best sustained pool pace on a 1 km+ swim, +5% for open water
+  //   bike — best average speed on a 40 km+ ride, 3% slower over 90 km
+  //   run  — best 5 km+ run scaled to 21.1 km (Riegel, ^1.06), +8% off the bike
+  //   transitions — 6 min + 4 min
+  function predict() {
+    const from = TP.addDays(today, -56);
+    const recent = acts.filter(a => actIso(a) >= from && a.distance_m && a.moving_s);
+    const swims = recent.filter(a => a.type === "Swim" && a.distance_m >= 1000);
+    const rides = recent.filter(a => actType(a) === "bike" && a.distance_m >= 40000);
+    const runs = recent.filter(a => actType(a) === "run" && a.distance_m >= 5000);
+    if (!swims.length || !rides.length || !runs.length) return null;
+    const swimPace = Math.min.apply(null, swims.map(a => a.moving_s / (a.distance_m / 100))) * 1.05;
+    const bikeSpd = Math.max.apply(null, rides.map(a => a.distance_m / a.moving_s)) * 0.97;
+    const runHalf = Math.min.apply(null, runs.map(a => a.moving_s * Math.pow(21097 / a.distance_m, 1.06))) * 1.08;
+    const p = { swim: swimPace * 19, t1: 360, bike: 90000 / bikeSpd, t2: 240, run: runHalf, swimPace: swimPace, bikeKmh: bikeSpd * 3.6, runPace: runHalf / 21.097 };
+    p.total = p.swim + p.t1 + p.bike + p.t2 + p.run;
+    return p;
+  }
+  function renderPredict() {
+    const p = predict(), card = $("predict");
+    if (!p) { card.hidden = true; return; }
+    card.hidden = false;
+    const hm = s => { const m = Math.round(s / 60); return Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"); };
+    $("predTotal").textContent = hm(p.total);
+    $("predRange").textContent = "± " + Math.round(p.total * 0.05 / 60) + " min";
+    const leg = (type, label, time, sub) => '<div class="leg"><i class="dot" style="background:' + col(type) + '"></i><span class="leg-l">' + label + '</span><span class="leg-s">' + sub + '</span><b>' + time + '</b></div>';
+    $("predLegs").innerHTML =
+      leg("swim", "Swim 1.9 km", fmtClock(p.swim), TP.fmtPace(p.swimPace) + " /100m") +
+      leg("rest", "T1", fmtClock(p.t1), "") +
+      leg("bike", "Bike 90 km", fmtClock(p.bike), p.bikeKmh.toFixed(1) + " km/h") +
+      leg("rest", "T2", fmtClock(p.t2), "") +
+      leg("run", "Run 21.1 km", fmtClock(p.run), TP.fmtPace(p.runPace) + " /km");
+    $("predFoot").textContent = "From her best swim, ride and run in the last 8 weeks, adjusted for open water, a longer ride and running off the bike. It moves as she trains.";
+  }
+
+  // ---------- race-distance check ----------
+  // How close her longest recent swim / ride / run is to each 70.3 leg.
+  const RACE_DIST = [["swim", "Swim", 1900], ["bike", "Bike", 90000], ["run", "Run", 21100]];
+  function renderRaceReady() {
+    const season = acts.filter(a => actIso(a) >= TP.PLAN_START);
+    $("raceCard").hidden = !season.length;
+    if (!season.length) return;
+    const recentFrom = TP.addDays(today, -56);
+    const best = (t, from) => season.filter(a => actType(a) === t && actIso(a) >= from).reduce((m, a) => Math.max(m, a.distance_m || 0), 0);
+    const fmt = (t, m) => t === "swim" ? (m / 1000).toFixed(2).replace(/0$/, "") + " km" : (m / 1000).toFixed(1).replace(/\.0$/, "") + " km";
+    $("raceReady").innerHTML = RACE_DIST.map(r => {
+      const t = r[0], recent = best(t, recentFrom), top = best(t, TP.PLAN_START), pct = Math.min(1, recent / r[2]);
+      return '<div class="rr" style="--acc:' + col(t) + '">' +
+        '<div class="rr-top"><span class="rr-l"><i class="dot" style="background:' + col(t) + '"></i>' + r[1] + '</span>' +
+        '<span class="rr-v"><b>' + fmt(t, recent) + '</b> / ' + fmt(t, r[2]) + (pct >= 1 ? ' <span class="ok">✓</span>' : '') + '</span></div>' +
+        '<div class="rr-bar"><i style="width:' + Math.round(pct * 100) + '%"></i></div>' +
+        (top > recent ? '<div class="rr-sub">Season best ' + fmt(t, top) + '</div>' : '') + '</div>';
+    }).join("");
+    const hrs = season.reduce((m, a) => m + (a.moving_s || 0), 0) / 3600;
+    $("seasonTotals").textContent = season.length + " workouts · " + Math.round(hrs) + " hours since " + prettyDate(TP.PLAN_START);
+  }
 
   // ---------- week review ----------
   // Completion is only half the story: this also names what was missed and gives
@@ -746,81 +959,102 @@
     };
   }
 
-  // ---------- readiness strip (sleep / HRV / resting HR) ----------
-  // Wellness syncs from Garmin every day, including days with no workout, so
-  // this works even while there are no recorded activities to tick off.
-  function mean(xs) { return xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null; }
-
-  function renderReadiness(days) {
-    const el = $("readiness");
-    if (!el || !days || !days.length) return;
-    const sorted = days.slice().sort((a, b) => a.date < b.date ? -1 : 1);
-    const latest = sorted[sorted.length - 1];
-    if (!latest) return;
-
-    // baselines from the trailing window, excluding the day being judged
-    const prior = sorted.slice(0, -1).slice(-28);
-    const hrvBase = mean(prior.map(d => d.hrv).filter(v => typeof v === "number"));
-    const rhrBase = mean(prior.map(d => d.resting_hr).filter(v => typeof v === "number"));
-
-    const sleepH = latest.sleep_s ? latest.sleep_s / 3600 : null;
-    const hrv = typeof latest.hrv === "number" ? latest.hrv : null;
-    const rhr = typeof latest.resting_hr === "number" ? latest.resting_hr : null;
-
-    const set = (id, txt) => { const n = $(id); if (n) n.textContent = txt; };
-    const delta = (v, base, invert) => {
-      if (v === null || base === null) return "";
-      const d = v - base, r = Math.round(d * 10) / 10;
-      const good = invert ? d <= 0 : d >= 0;
-      return (r > 0 ? "+" : "") + r + " vs avg" + (good ? " ✓" : "");
-    };
-
-    set("rdDate", latest.date === today ? "last night" : prettyDate(latest.date));
-    set("rdSleep", sleepH ? sleepH.toFixed(1) + "h" : "—");
-    set("rdSleepSub", latest.sleep_score ? "score " + latest.sleep_score : (sleepH ? "" : "not recorded"));
-    set("rdHrv", hrv !== null ? String(hrv) : "—");
-    set("rdHrvSub", delta(hrv, hrvBase, false));
-    set("rdRhr", rhr !== null ? String(rhr) : "—");
-    set("rdRhrSub", delta(rhr, rhrBase, true));
-    set("rdSteps", latest.steps ? (latest.steps >= 10000 ? (latest.steps / 1000).toFixed(1) + "k" : latest.steps.toLocaleString()) : "—");
-
-    // Simple, conservative read — flags only where we actually have a signal.
-    const flags = [];
-    if (sleepH !== null && sleepH < 6) flags.push("short sleep");
-    if (hrv !== null && hrvBase !== null && hrv < hrvBase * 0.92) flags.push("HRV below your baseline");
-    if (rhr !== null && rhrBase !== null && rhr > rhrBase + 3) flags.push("resting HR up");
-
-    let verdict, cls, note;
-    if (flags.length >= 2) {
-      verdict = "Go easy"; cls = "rd-verdict low";
-      note = "Your body's asking for a lighter day — " + flags.join(" and ") + ". Keep today easy, or swap the hard session to tomorrow.";
-    } else if (flags.length === 1) {
-      verdict = "Steady"; cls = "rd-verdict mid";
-      note = "Mostly fine, but " + flags[0] + ". Start easy and see how the legs feel before pushing.";
-    } else if (hrv === null && sleepH === null) {
-      verdict = "No data"; cls = "rd-verdict mid";
-      note = "Nothing recorded overnight — worth checking the watch was worn.";
-    } else {
-      verdict = "Primed"; cls = "rd-verdict good";
-      note = "Sleep and HRV are where they should be. A good day to take on the hard session.";
-    }
-    const badge = $("rdVerdict"); badge.textContent = verdict; badge.className = cls;
-    set("rdNote", note);
-    el.hidden = false;
-  }
-
-  // Only a recent night is worth judging today by — older than that, the card
-  // stays hidden and the watch section says the health feed has gone quiet.
+  // ---------- health data ----------
   async function loadReadiness() {
     if (!ICU_SYNC_ENABLED) return;
     try {
-      const r = await icuCall("wellness", { oldest: TP.addDays(today, -120), newest: today });
-      const days = (r && r.days) || [];
-      if (!days.length) return;
-      wellnessLast = days.map(d => d.date).sort().pop();
-      if (TP.daysBetween(wellnessLast, today) <= 3) renderReadiness(days.filter(d => d.date >= TP.addDays(today, -45)));
-      renderWatch();
+      const r = await icuCall("wellness", { oldest: TP.addDays(today, -60), newest: today });
+      wellness = (r && r.days) || [];
+      renderHero();
     } catch (e) { /* readiness is a bonus — never block the app on it */ }
+  }
+
+  // ---------- the plan, on her watch ----------
+  // The next two weeks go to her intervals.icu calendar as structured workouts,
+  // and intervals.icu passes them to Garmin. A GitHub Actions job does this every
+  // morning; the site does it too after a swap (so the watch follows the change)
+  // and once a day from each device as a backstop.
+  const PUSH_KEY = "htp_push";
+  let pushTimer = null;
+  function planWorkouts(from, to) {
+    const out = [], css = state.css && state.css.s;
+    for (let d = from; d <= to; d = TP.addDays(d, 1)) {
+      sessionsOfDay(d).forEach((s, i) => TP.watchWorkouts(s, css, d).forEach(w =>
+        out.push({ date: d, key: d + "-" + i + w.suffix, type: w.type, name: w.name, description: w.description })));
+    }
+    return out;
+  }
+  async function pushPlan(opts) {
+    const quiet = opts && opts.quiet, from = today, to = TP.addDays(today, 13);
+    if (!quiet) $("wpBtn").classList.add("busy");
+    try {
+      const r = await icuCall("push", { from: from, to: to, workouts: planWorkouts(from, to) });
+      if (!r || r.error) throw new Error(r && r.error);
+      try { localStorage.setItem(PUSH_KEY, JSON.stringify({ at: Date.now(), day: today, n: r.pushed })); } catch (e) { /* ignore */ }
+      if (!quiet) toast("✓ " + r.pushed + " workouts sent to her watch");
+    } catch (e) {
+      if (!quiet) toast("Couldn't send to the watch");
+    }
+    $("wpBtn").classList.remove("busy");
+    renderPushStatus();
+  }
+  function schedulePush() { clearTimeout(pushTimer); pushTimer = setTimeout(() => pushPlan({ quiet: true }), 1500); }
+  function lastPush() { try { return JSON.parse(localStorage.getItem(PUSH_KEY)); } catch (e) { return null; } }
+  function renderPushStatus() {
+    const p = lastPush();
+    $("wpSub").textContent = p
+      ? p.n + " workouts for the next two weeks · sent " + ago(p.at)
+      : "Sends the next two weeks to Garmin, via intervals.icu";
+  }
+
+  // ---------- swim pace (CSS) ----------
+  // CSS = (400 m time − 200 m time) ÷ 2, per 100 m. The plan schedules a test
+  // every six weeks over the winter; when one has a watch swim attached, its laps
+  // are checked for the 400 and the 200, and every CSS target updates from it.
+  function cssify(text) {
+    if (!state.css || !state.css.s) return text;
+    return String(text).replace(/\bCSS\b(?!\s*(?:test|\/|·))/g, "CSS (" + TP.fmtPace(state.css.s) + "/100m)");
+  }
+  function nextCssTest() {
+    for (let d = today; d <= TP.RACE_703; d = TP.addDays(d, 1)) {
+      if (sessionsOfDay(d).some(s => /CSS test/i.test(s.title))) return d;
+    }
+    return null;
+  }
+  function setCss(sec, iso, src, extra) {
+    state.css = Object.assign({ s: Math.round(sec), date: iso, src: src }, extra || {});
+    persist(); rerenderAll(); schedulePush();
+    toast("Swim pace updated — CSS " + TP.fmtPace(sec) + " /100m");
+  }
+  async function detectCss() {
+    let tried = {}; try { tried = JSON.parse(localStorage.getItem("htp_css_tried")) || {}; } catch (e) { /* ignore */ }
+    for (const key of Object.keys(links.bySession)) {
+      const iso = key.split(":")[0], s = sessionsOfDay(iso)[Number(key.split(":")[1])];
+      const a = links.bySession[key][0];
+      if (!s || !/CSS test/i.test(s.title) || tried[a.id] || (state.css && state.css.date >= iso)) continue;
+      tried[a.id] = 1;
+      try {
+        const r = await icuCall("intervals", { id: a.id });
+        const laps = (r && r.laps) || [];
+        const best = m => laps.filter(l => l.distance_m && l.moving_s && Math.abs(l.distance_m - m) <= m * 0.05).reduce((x, l) => Math.min(x, l.moving_s), Infinity);
+        const t4 = best(400), t2 = best(200);
+        if (isFinite(t4) && isFinite(t2) && t4 > t2) setCss((t4 - t2) / 2, iso, "test", { t400: t4, t200: t2 });
+      } catch (e) { delete tried[a.id]; }
+    }
+    try { localStorage.setItem("htp_css_tried", JSON.stringify(tried)); } catch (e) { /* ignore */ }
+  }
+  function renderCss() {
+    const c = state.css, next = nextCssTest();
+    $("cssVal").textContent = c ? TP.fmtPace(c.s) : "—";
+    $("cssSub").textContent = c ? "/100m · " + (c.src === "test" ? "from the test on " : "entered ") + prettyDate(c.date) : "not tested yet";
+    $("cssSrc").textContent = c ? (c.src === "test" ? "Auto" : "Manual") : "";
+    $("cssSrc").hidden = !c;
+    $("cssFoot").textContent = (next ? "Next test " + DOW[TP.weekdayMon0(next)] + " " + prettyDate(next) + " — swim it with the watch and this updates itself. " : "") +
+      (c ? "Endurance sets on her watch now target " + TP.fmtPace(c.s + 3) + "–" + TP.fmtPace(c.s + 6) + " /100m." : "Until then, swims go to the watch without pace targets.");
+  }
+  function parseClock(t) {
+    const m = String(t || "").trim().match(/^(\d{1,2})[:.](\d{2})$/);
+    return m ? Number(m[1]) * 60 + Number(m[2]) : NaN;
   }
 
   async function initActivitySync() {
@@ -884,13 +1118,13 @@
     const na = state.notes[a], nb = state.notes[b];
     if (nb) state.notes[a] = nb; else delete state.notes[a];
     if (na) state.notes[b] = na; else delete state.notes[b];
-    persist(); rerenderAll(); openDrawer(a);
+    persist(); rerenderAll(); openDrawer(a); schedulePush();
     toast("Swapped with " + DOW[TP.weekdayMon0(b)] + " " + TP.parse(b).getDate() + " " + MON_ABBR[TP.parse(b).getMonth()]);
   }
   function resetDay(iso) {
     delete state.overrides[iso];
     sessionsOfDay(iso).forEach((_, i) => delete state.done[keyFor(iso, i)]);
-    persist(); rerenderAll(); openDrawer(iso);
+    persist(); rerenderAll(); openDrawer(iso); schedulePush();
     toast("Day reset to the original plan");
   }
 
@@ -1151,32 +1385,7 @@
     const pct = Math.round(Math.min(1, Math.max(0, TP.daysBetween(TP.PLAN_START, today) / total)) * 100);
     $("seasonPct").textContent = pct + "% through the season";
     requestAnimationFrame(() => { $("seasonFill").style.width = pct + "%"; });
-    renderRaceReady();
     $("aliQuote").textContent = "There is no way around the hard work. Embrace it — and know I'm cheering for every single session.";
-  }
-
-  // How close her longest recent swim / ride / run is to each 70.3 leg. Recent
-  // (8 weeks) is what she could do now; the season best sits underneath.
-  const RACE_DIST = [["swim", "Swim", 1900], ["bike", "Bike", 90000], ["run", "Run", 21100]];
-  function renderRaceReady() {
-    const el = $("raceReady");
-    const season = acts.filter(a => actIso(a) >= TP.PLAN_START);
-    if (!season.length) { el.parentElement.hidden = true; return; }
-    el.parentElement.hidden = false;
-    const recentFrom = TP.addDays(today, -56);
-    const best = (t, from) => season.filter(a => actType(a) === t && actIso(a) >= from).reduce((m, a) => Math.max(m, a.distance_m || 0), 0);
-    const fmt = (t, m) => t === "swim" ? (m / 1000).toFixed(2).replace(/0$/, "") + " km" : (m / 1000).toFixed(1).replace(/\.0$/, "") + " km";
-    el.innerHTML = RACE_DIST.map(r => {
-      const t = r[0], recent = best(t, recentFrom), top = best(t, TP.PLAN_START), pct = Math.min(1, recent / r[2]);
-      return '<div class="rr" style="--acc:' + col(t) + '">' +
-        '<div class="rr-top"><span class="rr-l"><i class="dot" style="background:' + col(t) + '"></i>' + r[1] + '</span>' +
-        '<span class="rr-v"><b>' + fmt(t, recent) + '</b> of ' + fmt(t, r[2]) + (pct >= 1 ? ' ✓' : '') + '</span></div>' +
-        '<div class="rr-bar"><i style="width:' + Math.round(pct * 100) + '%"></i></div>' +
-        '<div class="rr-sub">' + (pct >= 1 ? "Race distance covered in the last 8 weeks" : Math.round(pct * 100) + "% of race distance · longest in the last 8 weeks") +
-        (top > recent ? " · season best " + fmt(t, top) : "") + '</div></div>';
-    }).join("");
-    const hrs = season.reduce((m, a) => m + (a.moving_s || 0), 0) / 3600;
-    $("seasonTotals").textContent = season.length + " workouts · " + Math.round(hrs) + " hours since " + prettyDate(TP.PLAN_START);
   }
 
   // ---------- sheet (day detail) ----------
@@ -1335,16 +1544,18 @@
   })();
 
   // ---------- wiring ----------
-  const TITLES = { today: "Today", calendar: "Plan", blocks: "Journey" };
+  const TITLES = { today: "Today", calendar: "Plan", progress: "Progress", blocks: "Journey" };
   function showView(v) {
     document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.getAttribute("data-view") === v));
     $("view-today").hidden = v !== "today";
     $("view-calendar").hidden = v !== "calendar";
+    $("view-progress").hidden = v !== "progress";
     $("view-blocks").hidden = v !== "blocks";
     $("nbTitle").textContent = TITLES[v];
     if (v === "blocks") renderBlocks();
     if (v === "today") renderToday();
-    if (v === "calendar") renderPlan();
+    if (v === "calendar") { renderPlan(); renderPushStatus(); }
+    if (v === "progress") { renderProgress(); renderReview(); }
     window.scrollTo(0, 0);
     try { sessionStorage.setItem("htp_tab", v); } catch (e) { /* ignore */ }
   }
@@ -1355,6 +1566,22 @@
   }));
 
   $("goalCard").addEventListener("click", () => setFocus(!focusRace));
+  $("wpBtn").addEventListener("click", () => pushPlan({}));
+  $("cssEdit").addEventListener("click", () => {
+    const go = () => { const f = $("cssForm"); f.hidden = !f.hidden; if (!f.hidden) $("css400").focus(); };
+    if (ensureEdit(go)) go();
+  });
+  $("cssSave").addEventListener("click", () => {
+    const t4 = parseClock($("css400").value), t2 = parseClock($("css200").value);
+    if (!(t4 > t2 && t2 > 0)) { toast("Times as m:ss — the 400 slower than the 200"); return; }
+    const css = (t4 - t2) / 2;
+    if (css < 60 || css > 240) { toast("That gives an unlikely pace — check the times"); return; }
+    $("cssForm").hidden = true;
+    setCss(css, today, "manual", { t400: t4, t200: t2 });
+  });
+  // charts are drawn to their container's width, so redraw when it changes
+  let chartTimer = null;
+  addEventListener("resize", () => { clearTimeout(chartTimer); chartTimer = setTimeout(renderProgress, 150); });
   $("focusClear").addEventListener("click", () => setFocus(false));
   document.querySelectorAll(".seg-opt").forEach(b => b.addEventListener("click", () => setCalMode(b.getAttribute("data-mode"))));
   $("prev").addEventListener("click", () => shiftMonth(-1));
@@ -1508,6 +1735,9 @@
   renderReview(); renderUpNext(); recomputeStats();
   // Auto-ticking waits for the cloud copy of her ticks — otherwise a slow load
   // would land on top of fresh Garmin ticks and quietly undo them.
-  cloudInit().then(initActivitySync);
+  cloudInit().then(initActivitySync).then(() => {
+    const p = lastPush();
+    if (!p || p.day !== today) pushPlan({ quiet: true });   // backstop for the morning job
+  });
   loadReadiness();
 })();
