@@ -1,10 +1,8 @@
 # Harriet's Training Plan 🏊 🚴 🏃
 
-A calm, aesthetic training-plan website for **Harriet Meers** — one continuous build across three races:
+A calm, aesthetic training-plan website for **Harriet Meers** — one continuous build toward a single goal:
 
-- **Sprint Triathlon** — 26 Sep 2026
-- **Ipswich Half Marathon** (sub‑2) — 27 Sep 2026
-- **Ironman 70.3** — Apr / May 2027
+- **Ironman 70.3** — 9 May 2027 (1.9 km swim · 90 km bike · 21.1 km run)
 
 It's a single-page site with a **dynamic calendar**. Tap any day to see the exact sessions, open a
 workout for the full breakdown (sets, paces, drills), tick things off as complete, and jot notes on how
@@ -70,14 +68,12 @@ At the top of `data.js`:
 
 ```js
 const PLAN_START  = "2026-07-27";              // Monday of week 1
-const SPRINT_TRI  = "2026-09-26";
-const IPSWICH_HALF= "2026-09-27";
+const BLOCK1_END  = "2026-09-27";              // last day of the summer Foundation block
 const DOLOMITES   = ["2026-08-24", "2026-08-27"]; // camp window (assumed — edit!)
 const RACE_703    = "2027-05-09";              // real Apr/May date once known
 ```
 
-- **Dolomites dates are assumed** to be 24–27 August (you'd originally written 24–27 September, which
-  clashes with race weekend). Change them to the true window and the camp sessions move automatically.
+- **Dolomites dates are assumed** to be 24–27 August (you'd originally written 24–27 September). Change them to the true window and the camp sessions move automatically.
 - Set `RACE_703` to the real 70.3 date and the whole build/taper re-flows around it.
 - Weekly key sessions for the 9-week block live in the `P1` object; the workout library (`R2`, `S1`,
   `LOWER`, …) is just below — edit paces, distances or drills there and they update everywhere.
@@ -90,4 +86,4 @@ const RACE_703    = "2027-05-09";              // real Apr/May date once known
   device or clearing site data starts fresh. There's a **reset** link at the bottom of the page.
 - Paces are built from a 1:58:59 half; heart-rate guidance and the full rationale are in the companion PDF.
 
-Made with care. Most of it easy, some of it hard, all of it fuelled. ♡
+Made with care. Most of it easy, some of it hard, all of it fuelled. Built by her best friend, Ali.
