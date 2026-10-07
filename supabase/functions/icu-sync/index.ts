@@ -192,6 +192,18 @@ Deno.serve(async (req) => {
         }
       };
 
+      // 00. Garmin connection settings on the athlete — on/off flags and the last
+      //     upload time only, never tokens
+      try {
+        const r = await fetch(`${ICU_BASE}/athlete/${ICU_ATHLETE_ID}`, { headers: { Authorization: authHeader() } });
+        const ath = await r.json();
+        const g: Record<string, unknown> = {};
+        for (const k of Object.keys(ath ?? {})) {
+          if (/garmin|upload|sync/i.test(k)) g[k] = typeof ath[k] === "boolean" || ath[k] === null || /last_upload$/.test(k) ? ath[k] : typeof ath[k];
+        }
+        out.garmin_settings = g;
+      } catch (e) { out.garmin_settings = String(e); }
+
       // 0. which fields an activity actually carries (names only, no values)
       try {
         const r = await fetch(`${ICU_BASE}/athlete/${ICU_ATHLETE_ID}/activities?oldest=2026-09-01&newest=2026-12-31`, { headers: { Authorization: authHeader() } });
