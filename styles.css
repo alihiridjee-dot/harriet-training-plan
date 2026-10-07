@@ -787,3 +787,82 @@ textarea::placeholder{color:var(--ink-3);}
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms !important;transition-duration:.01ms !important;}
 }
+
+/* ============================================================
+   THE WATCH — Garmin → intervals.icu → here
+   ============================================================ */
+/* what she actually did, under a planned session */
+.actual{margin-top:12px;padding:10px 12px;border-radius:14px;background:var(--good-soft);}
+.act-head{display:flex;align-items:center;justify-content:space-between;}
+.act-src{font-size:12.5px;font-weight:700;color:var(--good);letter-spacing:.01em;}
+.act-line{display:flex;align-items:center;gap:6px;}
+.act-line .pills{margin-top:6px;}
+.act-ic{font-size:15px;margin-top:6px;}
+.row-act{display:block;margin-top:5px;font-size:13px;font-weight:600;color:var(--good);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* workouts the plan didn't ask for */
+.list-cap{font-size:13px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;padding:12px 16px 2px;}
+.extras{margin-top:12px;}
+.sess + .extras, .extras + .notes-wrap{margin-top:10px;}
+.act-tag{--acc:var(--ink-3);}
+.act-tag.ok{--acc:var(--good);}
+.cdots .xdot,.rh-dots .xdot,.dot.xdot{background:transparent !important;box-shadow:inset 0 0 0 1.5px var(--acc);}
+
+/* week volume tiles */
+#watch .vol{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px;}
+.vol-t{background:var(--fill-2);border-radius:14px;padding:10px 8px;min-width:0;}
+.vol-l{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;color:var(--ink-2);}
+.vol-l .dot{width:7px;height:7px;}
+.vol-n{font-family:var(--font-round);font-size:19px;font-weight:700;margin-top:4px;white-space:nowrap;}
+.vol-sub{font-size:11px;color:var(--ink-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#latestActs{margin-top:12px;}
+
+/* fitness / fatigue / form */
+.fitness{padding:16px;margin-top:12px;}
+.fit-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.fit-t{text-align:center;background:var(--fill-2);border-radius:14px;padding:10px 4px;}
+.fit-n{font-family:var(--font-round);font-size:22px;font-weight:700;}
+.fit-l{font-size:12px;color:var(--ink-2);font-weight:600;}
+.fit-sub{font-size:10.5px;color:var(--ink-3);margin-top:2px;}
+.fit-chart{position:relative;margin-top:14px;min-height:132px;}
+.fit-chart svg{display:block;overflow:visible;}
+.fit-chart .fg{stroke:var(--sep);stroke-width:1;}
+.fit-chart .ft{fill:var(--ink-3);font-size:10.5px;font-weight:500;}
+.fit-chart .fa{fill:var(--accent);opacity:.1;}
+.fit-chart .fl{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;stroke-linecap:round;}
+.fit-chart .fd{fill:var(--accent);stroke:var(--card);stroke-width:2;}
+.fit-chart .fv{fill:var(--ink);font-size:13px;font-weight:700;}
+.fit-chart .fx{stroke:var(--ink-3);stroke-width:1;}
+.fit-chart .fhit{fill:transparent;cursor:crosshair;touch-action:pan-y;}
+.fit-tip{position:absolute;top:-6px;pointer-events:none;z-index:2;
+  background:var(--bg-elev);box-shadow:0 6px 20px -6px rgba(0,0,0,.3), 0 0 0 .5px var(--sep);
+  border-radius:12px;padding:7px 10px;font-size:12.5px;color:var(--ink-2);white-space:nowrap;}
+.fit-tip b{color:var(--ink);font-size:14px;}
+.fit-tip .tip-d{font-size:11.5px;color:var(--ink-3);font-weight:600;margin-bottom:2px;}
+
+.watch-note{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--warn-soft);font-size:14px;line-height:1.45;color:var(--ink);}
+
+/* week review: the watch's view of the week */
+.rv-watch:empty{display:none;}
+.rv-watch{margin-top:14px;}
+.rv-watch-l{font-size:13px;font-weight:700;color:var(--ink-2);}
+.rv-watch .pills{margin-top:6px;}
+
+/* race-distance check */
+.race-ready{padding:16px;}
+.rr + .rr{margin-top:16px;}
+.rr-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}
+.rr-l{display:flex;align-items:center;gap:7px;font-size:16px;font-weight:700;}
+.rr-v{font-size:14px;color:var(--ink-2);white-space:nowrap;}
+.rr-v b{color:var(--ink);font-size:16px;}
+.rr-bar{height:10px;border-radius:5px;margin-top:8px;overflow:hidden;background:color-mix(in srgb, var(--acc) 16%, transparent);}
+.rr-bar i{display:block;height:100%;border-radius:5px;background:var(--acc);transition:width .8s var(--ease);}
+.rr-sub{font-size:12.5px;color:var(--ink-3);margin-top:6px;}
+.rr-foot{margin-top:16px;padding-top:12px;border-top:.5px solid var(--sep);font-size:13.5px;color:var(--ink-2);font-weight:500;}
+.rr-foot:empty{display:none;}
+@media (max-width:480px){
+  #watch .vol{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .vol-t{display:grid;grid-template-columns:1fr auto;align-items:baseline;column-gap:6px;}
+  .vol-n{grid-row:2;}
+  .vol-sub{grid-row:2;text-align:right;}
+}

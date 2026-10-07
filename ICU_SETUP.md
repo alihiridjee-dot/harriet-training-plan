@@ -70,7 +70,9 @@ never shows a control that would fail.
 
 - Syncs automatically on load, and the **Sync** button pulls on demand.
 - It's behind the same PIN gate as any other change.
-- The default window is the last 45 days.
+- It pulls everything from 90 days before the plan start, so old weeks get ticked too
+  and the fitness curve has history to warm up on. Activities are cached on the device,
+  so the page shows them instantly while the fresh copy loads.
 
 ## Readiness strip
 
@@ -98,16 +100,42 @@ flowing but no activities are.
 | Run, TrailRun, VirtualRun, Treadmill | Run |
 | Ride, VirtualRide, GravelRide, MountainBikeRide, EBikeRide | Bike |
 | Swim, OpenWaterSwim | Swim |
-| WeightTraining, Crossfit, Workout | Strength |
-| Yoga, Walk, Hike, Elliptical | Mobility |
+| WeightTraining, Crossfit, Workout, HighIntensityIntervalTraining | Strength |
+| Yoga, Pilates, Walk, Hike, Elliptical | Mobility |
+
+Matching runs in passes, longest workout first, so the main effort claims the session
+and a 5-minute warm-up jog doesn't:
+
+1. **Same day, same discipline.** On race day, every swim, bike and run attaches to the
+   race. A brick ride also picks up the run done straight off the bike.
+2. **Moved by a day.** A workout that still has no home claims a free session of the same
+   discipline the day before or after (shown as "Done Mon instead"). It never claims a
+   session she already ticked by hand.
+3. **Everything else is an extra.** It doesn't tick anything, but it shows on the
+   calendar as a hollow dot and in the day sheet under "Also on the watch".
+
+Workouts under 10 minutes never claim a session. Matching is recalculated on every
+render from the plan and the activity list, so swapping two days re-matches straight away.
 
 Rules that keep it safe:
 
-- Only ticks a session on the **same calendar date** as the activity.
 - **Never un-ticks** anything, and never overwrites something ticked by hand.
 - Each activity is recorded once (`imported` in the saved state), so re-syncing won't
   re-tick a session she deliberately cleared.
-- Anything unrecognised is ignored rather than guessed at.
+- Auto-ticking waits until the saved state has loaded from Supabase, so a slow load can't
+  overwrite fresh ticks with an older copy.
+
+## What else the data drives
+
+- **Session cards** show the real distance, time, pace and average HR under the plan.
+- **From your watch** (Today): this week's swim/bike/run/time against last week, the
+  latest workouts, and a fitness/fatigue/form chart. That uses the standard 42-day/7-day
+  model on intervals.icu's training load; workouts with no load count at 60 per hour.
+- **Week review** adds what the watch recorded that week.
+- **Race-distance check** (Journey): the longest swim, ride and run in the last 8 weeks
+  against the 70.3 distances.
+- **Readiness** only shows when the newest sleep/HRV is at most 3 days old. If health
+  data stops arriving, the watch section says when it last came through.
 
 ## Rate limits
 

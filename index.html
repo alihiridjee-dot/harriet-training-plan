@@ -17,7 +17,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=40">
+<link rel="stylesheet" href="styles.css?v=41">
 </head>
 <body>
 
@@ -159,6 +159,30 @@
           <div class="rd-note" id="rdNote"></div>
         </section>
 
+        <!-- from the watch: Garmin → intervals.icu → here -->
+        <section id="watch" hidden>
+          <div class="sec-head">
+            <h2>From your watch</h2>
+            <span class="sec-meta" id="watchMeta"></span>
+          </div>
+          <div class="vol card" id="weekVol"></div>
+          <section class="fitness card" id="fitness" hidden>
+            <div class="card-head">
+              <span class="card-kicker">Fitness · last 12 weeks</span>
+              <span class="rd-verdict" id="fitVerdict">–</span>
+            </div>
+            <div class="fit-tiles">
+              <div class="fit-t"><div class="fit-n" id="fitCtl">–</div><div class="fit-l">Fitness</div><div class="fit-sub" id="fitCtlSub"></div></div>
+              <div class="fit-t"><div class="fit-n" id="fitAtl">–</div><div class="fit-l">Fatigue</div><div class="fit-sub">last 7 days</div></div>
+              <div class="fit-t"><div class="fit-n" id="fitForm">–</div><div class="fit-l">Form</div><div class="fit-sub">fitness − fatigue</div></div>
+            </div>
+            <div class="fit-chart" id="fitChart"></div>
+            <div class="rd-note" id="fitNote"></div>
+          </section>
+          <div class="list card" id="latestActs"></div>
+          <div class="watch-note" id="wellnessNote" hidden></div>
+        </section>
+
         <!-- week review -->
         <div class="sec-head">
           <h2>Week review</h2>
@@ -179,6 +203,7 @@
             <span><i class="rv-dot missed"></i>Missed</span>
             <span><i class="rv-dot upcoming"></i>To come</span>
           </div>
+          <div class="rv-watch" id="rvWatch"></div>
           <div class="rv-missed" id="rvMissed" hidden></div>
           <div class="rv-feedback">
             <div class="rv-fb-label" id="rvFbLabel">How did the week go?</div>
@@ -277,6 +302,13 @@
             <div class="season-l"><span>27 Jul 2026</span><b id="seasonPct">0%</b><span>9 May 2027</span></div>
           </div>
         </div>
+        <section>
+          <div class="sec-head"><h2>Race-distance check</h2></div>
+          <div class="card race-ready">
+            <div id="raceReady"></div>
+            <div class="rr-foot" id="seasonTotals"></div>
+          </div>
+        </section>
         <div class="timeline" id="blocksList"></div>
         <div class="bf-card">
           <div class="bf-quote" id="aliQuote"></div>
@@ -347,6 +379,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="data.js?v=9"></script>
-  <script src="app.js?v=40"></script>
+  <script src="app.js?v=41"></script>
 </body>
 </html>
