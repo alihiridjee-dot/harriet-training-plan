@@ -335,7 +335,7 @@
   }
 
   // on the site, in the plan's own shorthand: "10 min in Z2, 5 × (15 s in upper Z3 + 45 s in Z2)"
-  const STROKE = { FS: "FS", FSb3: "FS breathing every 3", Pull: "pull", Pullb5: "pull breathing every 5", Drill: "drill", Kick: "kick", Breast: "breaststroke", Back: "backstroke" };
+  const STROKE = { FS: "FS", FSb3: "FS breathing every 3", Pull: "pull", Pullb5: "pull breathing every 5", Drill: "drill", Kick: "kick", Breast: "breaststroke", Back: "backstroke", Mix: "mixed strokes" };
   const thou = n => String(n).replace(/\B(?=(\d{3})+$)/g, ",");
   function hms(sec) {
     if (sec < 120) return sec + " s";
@@ -353,6 +353,26 @@
       const body = x.steps.map(s => say(step(s))).concat(x.rest ? [x.rest + " s rest"] : []).join(" + ");
       return x.n > 1 ? x.n + " × (" + body + ")" : body;
     }).join(", ");
+  }
+
+  // the same steps as data for the site to draw: a profile (width = time,
+  // height = effort) over a step list. `sec` is the step's length, with swims
+  // at about 2:00 per 100 m; `eff` is ZONE's effort, 5.5 for a flat-out test.
+  function view(st) {
+    const z = st.z && st.z !== "TT" ? ZONE[st.z] : null;
+    return {
+      amt: st.m ? thou(st.m) + " m" : hms(st.sec), m: st.m || 0, sec: st.m ? st.m * 1.2 : st.sec,
+      what: st.m ? STROKE[st.kind] : st.rpm ? "big gear, " + st.rpm + " rpm" : "",
+      zone: st.z === "TT" ? "time trial" : z ? z[0] : "", eff: st.z === "TT" ? 5.5 : z ? z[5] : 2
+    };
+  }
+  // parts → [{ label, note, items: [{ n, steps, rest }] }]
+  function planOf(parts, label, notes) {
+    return SECTIONS.filter(p => parts[p[0]]).map(p => ({
+      label: label(p[0]), note: notes[p[0]] || "",
+      items: parts[p[0]].map(x => typeof x === "string" ? { n: 1, steps: [view(step(x))], rest: 0 }
+        : { n: x.n, steps: x.steps.map(s => view(step(s))), rest: x.rest || 0 })
+    }));
   }
 
   // on the watch: runs by pace, rides by heart rate (no power meter — and no
@@ -382,9 +402,10 @@
   }
 
   // ---------- session builders ----------
-  // parts: { wu, main, cd } step lists, `say` to word a section by hand and
-  // `labels` to rename one. opts: { tip, more (extra blocks), est (how it was
-  // rebuilt), optional }
+  // parts: { wu, main, cd } step lists, `say` to word a section by hand,
+  // `note` for a line under a section's steps on the site (defaults to `say`)
+  // and `labels` to rename one. opts: { tip, more (extra blocks), est (how it
+  // was rebuilt), optional }
   const SECTIONS = [["wu", "Warm-up"], ["main", "Main"], ["cd", "Cool-down"]];
   function build(type, title, sub, parts, opts) {
     opts = opts || {};
@@ -394,6 +415,7 @@
     if (opts.tip) blocks.push({ label: "Tip", text: opts.tip });
     const s = S(type, title, sub, blocks);
     s.ws = SECTIONS.filter(p => parts[p[0]]).map(p => wsList(parts[p[0]], type, label(p[0]))).join("");
+    s.plan = planOf(parts, label, Object.assign({}, said, parts.note));
     // planned minutes [easy, hard] for the 80/20 check: Z1–Z2 is easy, Z3 and
     // up is hard; swims count at about 2:00 per 100 m
     const z = [0, 0];
@@ -433,6 +455,9 @@
     ]), "\nWarm-up 6x\n- 50mtr\n\n- Rest 2m\n- Time trial 400mtr\n- Rest 5m\n- Time trial 200mtr\n- Cool-down 300mtr");
     s.est = "Warm-up and cool-down rebuilt from this workout's chart in the plan — the PDF cut the text off.";
     s.zmin = [20, 10];
+    s.plan = planOf({ wu: [rep(6, ["50 FS Z2"], 15)], main: ["400 FS TT", "5m Z12", "200 FS TT"], cd: ["300 Mix Z12"] },
+      k => SECTIONS.filter(p => p[0] === k)[0][1],
+      { wu: "Then a couple of minutes' easy rest.", main: "Swim the 400 m at the fastest pace you can hold evenly, recover with 5–10 min of easy swimming, then the 200 m flat out." });
     return s;
   };
   const FTP_TEST = () => ride("Bike — FTP & threshold HR test", 42, "20-min test", {
@@ -453,7 +478,8 @@
   const OFF_BIKE = (min, words) => run("Run off the bike", min, "Z2 · brick",
     { main: [min + "m Z2"], say: { main: words || "Straight off the bike: an easy, steady run in Z2." } });
   const OFF_BIKE_FAST = (min, fast, z, words) => run("Run off the bike — faster at first", min, "Z2 · first " + fast + "′ " + ZONE[z][0] + " · brick",
-    { main: [fast + "m " + z, (min - fast) + "m Z2"], say: { main: words || "Get off the bike and run: the first " + fast + " min in " + ZONE[z][0] + ", then ease down into Z2 for the last " + (min - fast) + "." } },
+    { main: [fast + "m " + z, (min - fast) + "m Z2"], say: { main: words || "Get off the bike and run: the first " + fast + " min in " + ZONE[z][0] + ", then ease down into Z2 for the last " + (min - fast) + "." },
+      note: { main: "Straight off the bike — start faster, then ease down." } },
     { tip: "Running off the bike harder at first gets your body used to the switch from cycling." });
   const THRESH_BIKE = (min, sub, parts) => ride("Bike — threshold efforts", min, sub, parts,
     { tip: "These tough sessions gradually raise your threshold on the bike." });
@@ -463,7 +489,7 @@
   const AE_BIKE = (min, parts, tip, optional) => ride("Bike — aerobic endurance" + (optional ? " (optional)" : ""), min, "upper Z2", parts,
     { optional: optional, tip: tip || "Works well on an indoor trainer, or outside. It's aerobic — it isn't meant to feel hard." });
   const TORQUE = (min, wu, main, cd) => ride("Bike — torque session (optional)", min, "big gear · Z3",
-    { wu: wu, main: main, cd: cd, say: { wu: sayList(wu) + ", at your normal cadence" } },
+    { wu: wu, main: main, cd: cd, say: { wu: sayList(wu) + ", at your normal cadence" }, note: { wu: "At your normal cadence — the big gear is only for the efforts." } },
     { optional: true, tip: "Think of it as a bike-specific gym session — it builds cycling strength." });
   // long ride: Z2 until warmed up, the efforts, then Z2 to the end
   const SUB_RIDE = (min, before, n, len, rec, sub) => ride("Long ride + sub-threshold efforts", min, "Z2 + " + sub, {
@@ -476,7 +502,8 @@
     sets.forEach((s, i) => { main.push(s[0] + "m Z3", s[1] + "m Z4"); if (i < 2) main.push((i ? 3 : 4) + "m Z12"); });
     return ride("Bike — IRONMAN 70.3 power slope", min, "Z3 → Z4", {
       wu: ["5m Z12", rep(5, ["15s Z3", "15s Z12", "15s Z4", "15s Z12"]), "5m Z12"], main: main, cd: ["7m Z12"],
-      say: { main: sets.map((s, i) => s[0] + " min in Z3 rising straight into " + s[1] + " min in Z4" + (i < 2 ? ", " + (i ? 3 : 4) + " min in Z1–2" : "")).join(", ") }
+      say: { main: sets.map((s, i) => s[0] + " min in Z3 rising straight into " + s[1] + " min in Z4" + (i < 2 ? ", " + (i ? 3 : 4) + " min in Z1–2" : "")).join(", ") },
+      note: { main: "Each Z3 block rises straight into its Z4 block — no easing off in between." }
     });
   }
   const SUSTAINED = (min, n, len, rec) => run("Run — IRONMAN 70.3 sustained efforts", min, n + " × " + len + "′ mid Z3",
@@ -561,7 +588,8 @@
   const OW_2200 = () => OPEN_WATER({ wu: WU_OW, main: [rep(2, ["800 FS Z3"], 60)], cd: ["400 FS Z2"] }, null, EST_SWIM);
   const OW_2550 = () => OPEN_WATER({ wu: WU_OW, main: [rep(3, ["750 FS Z3"], 60)], cd: ["100 FS Z2"] }, null, EST_SWIM);
   const OW_STARTS = () => OPEN_WATER({ wu: [rep(1, ["400 FS Z2"], 30)], main: [rep(4, ["50 FS Z5"], 30), "1000 FS uZ2"], cd: ["400 FS Z2"],
-    say: { main: "4 × (50 m FS in Z5 + 30 s rest) — practise race starts, from the beach or deep water — then 1,000 m FS in upper Z2." } }, null, EST_SWIM);
+    say: { main: "4 × (50 m FS in Z5 + 30 s rest) — practise race starts, from the beach or deep water — then 1,000 m FS in upper Z2." },
+    note: { main: "Make the 50s race starts — from the beach or deep water." } }, null, EST_SWIM);
   const RACE_PACE_SWIM = () => swim("Swim — race pace", "1.5 km at Z3", { wu: [rep(1, ["300 FS Z2"], 30)], main: [rep(1, ["1500 FS Z3"], 60)], cd: ["100 FS Z12"] },
     { tip: "Race distance at race effort — settle into the rhythm you want on the day.", est: "Cool-down read from this workout's chart in the plan — the PDF cut the text off." });
   const OW_RACE_WEEK = () => OPEN_WATER({ main: ["1500 FS Z2"],
@@ -919,16 +947,18 @@
   // per 100 m; without it swims still go over, just without pace targets.
   const SPORT = { run: "Run", bike: "Ride", swim: "Swim" };
   function fmtPace(sec) { sec = Math.round(sec); return Math.floor(sec / 60) + ":" + String(sec % 60).padStart(2, "0"); }
-  // `near` is the session's date: a swapped day is a saved copy that may predate
-  // watch steps, so look the same session up in the plan around that date.
-  function watchWorkouts(s, cssSec, near) {
-    if (s && !s.ws && near && SPORT[s.type]) {
-      for (let k = -28; k <= 28 && !s.ws; k++) {
-        getDay(addDays(near, k)).sessions.forEach(x => {
-          if (!s.ws && x.ws && x.type === s.type && x.title === s.title && x.sub === s.sub) s = Object.assign({}, s, { ws: x.ws, wsBrick: x.wsBrick });
-        });
-      }
+  // A swapped day is a saved copy that may predate a newer field (`ws`, `plan`),
+  // so look the same session up in the plan around `near`, its date.
+  function fromPlan(s, near, field) {
+    for (let k = -28; k <= 28; k++) {
+      const x = getDay(addDays(near, k)).sessions.filter(x => x[field] && x.type === s.type && x.title === s.title && x.sub === s.sub)[0];
+      if (x) return x;
     }
+    return null;
+  }
+  function watchWorkouts(s, cssSec, near) {
+    const x = s && !s.ws && near && SPORT[s.type] ? fromPlan(s, near, "ws") : null;
+    if (x) s = Object.assign({}, s, { ws: x.ws, wsBrick: x.wsBrick });
     if (!s || !s.ws || !SPORT[s.type]) return [];
     const fill = txt => txt.replace(/ ?%CSS([+-]\d+)?%/g, (m, off) => {
       if (!cssSec) return "";
@@ -942,7 +972,7 @@
   }
 
   const TP = {
-    PLAN_START, PLAN24, RACE_703, DOLOMITES, BLOCKS, currentBlock, watchWorkouts, fmtPace,
+    PLAN_START, PLAN24, RACE_703, DOLOMITES, BLOCKS, currentBlock, watchWorkouts, fromPlan, fmtPace,
     getDay, addDays, daysBetween, parse, iso, weekdayMon0, intensityOf, zoneSplit,
     TYPE_META: {
       run:      { label: "Run",      color: "#B0603A" },

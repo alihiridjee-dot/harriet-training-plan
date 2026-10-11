@@ -402,10 +402,77 @@
     if (!all.length) return "";
     return '<span class="pills"' + (acc ? ' style="--acc:' + acc + '"' : '') + '>' + all.join("") + '</span>';
   }
-  // Workout steps: label pill (Warm-up, Main…) over readable body text.
+  // Workout steps: section label (Warm-up, Main…) over readable body text.
   function steps(blocks, acc) {
     return '<div class="steps" style="--acc:' + acc + '">' + blocks.map(b =>
       '<div class="step"><span class="step-l">' + esc(b.label) + '</span><div class="step-t">' + esc(cssify(b.text)) + '</div></div>').join("") + '</div>';
+  }
+
+  // ---------- a workout, step by step ----------
+  // Phil's plan sessions carry `plan` (sections of steps and repeats, see
+  // data.js). They're drawn as an effort profile — width is time, height and
+  // depth of colour are effort, like TrainingPeaks — over a step list with the
+  // amount on the left and the zone on the right. A swapped day may be a copy
+  // saved before `plan` existed, so it's looked up again.
+  function planOf(s, iso) {
+    if (!s || s.plan || !/^(run|bike|swim)$/.test(s.type) || iso < TP.PLAN24) return s && s.plan;
+    const x = TP.fromPlan(s, iso, "plan");
+    return x && x.plan;
+  }
+  const effCls = e => "ef" + Math.max(1, Math.min(5, Math.round(e)));
+  const secTxt = sec => sec < 120 ? Math.round(sec) + " s" : fmtMin(sec / 60);
+  const fmtMin = m => { m = Math.round(m); return m < 60 ? m + " min" : Math.floor(m / 60) + " h" + (m % 60 ? " " + m % 60 + " min" : ""); };
+
+  // null when the whole session sits at one effort — a flat block says nothing
+  function profile(plan, small) {
+    const segs = [];
+    plan.forEach((sec, i) => {
+      if (i) segs.push(null);
+      sec.items.forEach(it => {
+        for (let k = 0; k < it.n; k++) {
+          it.steps.forEach(st => segs.push({ sec: st.sec, eff: st.eff, zone: st.zone }));
+          if (it.rest) segs.push({ sec: it.rest, eff: 0 });
+        }
+      });
+    });
+    const bars = [];
+    segs.forEach(x => {
+      const last = bars[bars.length - 1];
+      if (x && last && last.eff === x.eff) last.sec += x.sec; else bars.push(x && Object.assign({}, x));
+    });
+    if (new Set(segs.filter(x => x && x.eff).map(x => x.eff)).size < 2) return "";
+    return '<div class="prof' + (small ? " sm" : "") + '" aria-hidden="true">' + bars.map(b => !b ? '<i class="pgap"></i>'
+      : !b.eff ? '<i class="prest" style="flex-grow:' + b.sec + '"></i>'
+      : '<i class="' + effCls(b.eff) + '" style="flex-grow:' + b.sec + ';height:' + Math.round(16 + b.eff / 5.5 * 84) + '%" title="' + esc(secTxt(b.sec) + " · " + b.zone) + '"></i>').join("") + '</div>';
+  }
+
+  function woRow(st, n, rest) {
+    return '<div class="wo-row' + (st.eff >= 3 ? " hard" : "") + '"><span class="wo-amt"><b>' + (n > 1 ? n + " × " : "") + esc(st.amt) + '</b>' +
+      (st.what ? " " + esc(st.what) : "") + (rest ? '<span class="wo-rest"> · ' + esc(secTxt(rest)) + ' rest</span>' : "") + '</span>' +
+      (st.zone ? '<span class="wo-z"><i class="' + effCls(st.eff) + '"></i>' + esc(st.zone) + '</span>' : "") + '</div>';
+  }
+  function woItem(it) {
+    if (it.steps.length === 1) return woRow(it.steps[0], it.n, it.rest);
+    const rows = it.steps.map((st, i) => woRow(st, 1, i === it.steps.length - 1 ? it.rest : 0)).join("");
+    return it.n > 1 ? '<div class="wo-rep"><span class="wo-n">' + it.n + '×</span><div class="wo-in">' + rows + '</div></div>' : rows;
+  }
+  // a section's length: metres for a swim, time for the rest — left off when
+  // the section is one step that already says it
+  function woTotal(sec) {
+    if (sec.items.length === 1 && sec.items[0].n === 1 && sec.items[0].steps.length === 1) return "";
+    let m = 0, t = 0;
+    sec.items.forEach(it => it.steps.forEach(st => { m += it.n * st.m; t += it.n * st.sec; }));
+    return m ? m.toLocaleString("en-GB") + " m" : t ? secTxt(t) : "";
+  }
+  function workout(s, plan, acc) {
+    const more = (s.blocks || []).slice(plan.length);
+    return '<div class="wo" style="--acc:' + acc + '">' +
+      plan.map(sec => '<section class="wo-sec"><div class="wo-sh"><span class="wo-sl">' + esc(sec.label) + '</span><span class="wo-st">' + woTotal(sec) + '</span></div>' +
+        sec.items.map(woItem).join("") + (sec.note ? '<p class="wo-note">' + esc(cssify(sec.note)) + '</p>' : "") + '</section>').join("") +
+      more.map(b => b.label === "Tip"
+        ? '<p class="wo-tip">' + esc(cssify(b.text)) + '</p>'
+        : '<div class="wo-x"><span class="wo-sl">' + esc(b.label) + '</span><p>' + esc(cssify(b.text)) + '</p></div>').join("") +
+    '</div>';
   }
 
   function relDay(iso) {
@@ -561,14 +628,15 @@
 
     wrap.innerHTML = sessions.map((s, idx) => {
       const isRest = s.type === "rest", done = !!state.done[keyFor(today, idx)], strip = stripFor(today, idx);
-      const main = isRest ? "" : mainStep(s);
+      const plan = planOf(s, today), prof = plan && !strip ? profile(plan, true) : "";
+      const main = isRest || prof ? "" : mainStep(s);
       return '<article class="tcard card' + (done ? " done" : "") + (isRest ? " t-rest" : "") + '" style="--acc:' + col(s.type) + '">' +
         '<div class="tc-top">' +
           '<div class="tc-badge">' + (ICONS[s.type] || "•") + '</div>' +
           '<div class="tc-meta"><div class="tc-type">' + meta(s.type).label + '</div><h3>' + esc(s.title) + '</h3>' + pills(s.sub, col(s.type)) + '</div>' +
           (isRest ? '' : '<button class="check-hit tc-tick" data-idx="' + idx + '" aria-label="' + (done ? "Done — tap to undo" : "Mark as done") + '"><span class="check lg' + (done ? " on" : "") + '">' + CHECK_SVG + '</span></button>') +
         '</div>' +
-        (main && !strip ? '<p class="tc-main">' + esc(cssify(main)) + '</p>' : '') +
+        prof + (main && !strip ? '<p class="tc-main">' + esc(cssify(main)) + '</p>' : '') +
         strip +
         '<button class="tc-more">' + (isRest ? "Why rest matters" : "Full workout") + CHEV_SVG + '</button>' +
       '</article>';
@@ -1474,7 +1542,7 @@
     if (!day.sessions.length) html += '<div class="card sess"><h4>Nothing planned for this day</h4></div>';
     day.sessions.forEach((s, idx) => {
       const done = !!state.done[keyFor(isoStr, idx)], isRest = s.type === "rest";
-      const hasDetail = s.blocks && s.blocks.length;
+      const hasDetail = s.blocks && s.blocks.length, plan = planOf(s, isoStr);
       const open = expandedBefore ? expandedBefore[idx] : idx === 0;
       html += '<div class="sess card' + (done ? " done" : "") + (hasDetail && !open ? " collapsed" : "") + '">' +
         '<div class="sess-top">' +
@@ -1482,9 +1550,9 @@
           '<div class="sess-main"><div class="stype" style="color:' + col(s.type) + '">' + meta(s.type).label + '</div><h4>' + esc(s.title) + '</h4>' +
           pills(s.sub, col(s.type)) + '</div>' +
           (!isRest ? '<button class="check-hit d-chk" data-idx="' + idx + '" aria-label="Mark done"><span class="check' + (done ? " on" : "") + '">' + CHECK_SVG + '</span></button>' : '') +
-        '</div>' + stripFor(isoStr, idx);
+        '</div>' + (plan ? '<div style="--acc:' + col(s.type) + '">' + profile(plan) + '</div>' : '') + stripFor(isoStr, idx);
       if (hasDetail) {
-        html += '<div class="sess-detail">' + steps(s.blocks, col(s.type)) + (s.est ? '<p class="sess-est">' + esc(s.est) + '</p>' : '') + '</div>' +
+        html += '<div class="sess-detail">' + (plan ? workout(s, plan, col(s.type)) : steps(s.blocks, col(s.type))) + (s.est ? '<p class="sess-est">' + esc(s.est) + '</p>' : '') + '</div>' +
           '<button class="sess-toggle"><span class="st-l">' + (open ? "Hide workout" : "Show full workout") + '</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>';
       }
       html += '</div>';

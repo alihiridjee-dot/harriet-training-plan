@@ -377,16 +377,50 @@ svg{display:block;}
 }
 .date-pill{--acc:var(--ink);margin-top:4px;font-variant-numeric:tabular-nums;}
 
-/* workout steps: label pill over readable body text */
+/* workout steps: section label over readable body text */
 .steps{display:grid;gap:0;margin-top:14px;}
-.step{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:11px 0;border-top:.5px solid var(--sep);}
+.step{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:11px 0;border-top:.5px solid var(--sep);}
 .step:first-child{border-top:0;padding-top:0;}
-.step-l{
-  font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
-  padding:4px 10px;border-radius:999px;color:#fff;
-  background:color-mix(in srgb, var(--acc) 88%, #000);
+.step-l,.wo-sl{
+  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  color:color-mix(in srgb, var(--acc) 85%, var(--ink));
 }
 .step-t{font-size:15.5px;line-height:1.45;color:var(--ink);}
+
+/* a workout's effort profile: width is time, height and depth of colour are
+   effort (one hue, light → dark, like the zone bars); gaps are rests, a wider
+   gap is a new section */
+.prof{display:flex;align-items:flex-end;gap:1px;height:64px;margin-top:14px;}
+.prof.sm{height:44px;margin-top:14px;}
+.prof i{display:block;flex:1 1 0;min-width:1px;background:var(--acc);border-radius:2px 2px 0 0;}
+.prof .prest{background:none;}
+.prof .pgap{flex:0 0 3px;min-width:3px;background:none;}
+.prof .ef1,.wo-z .ef1{opacity:.28;} .prof .ef2,.wo-z .ef2{opacity:.42;} .prof .ef3,.wo-z .ef3{opacity:.62;}
+.prof .ef4,.wo-z .ef4{opacity:.8;} .prof .ef5,.wo-z .ef5{opacity:1;}
+
+/* the steps: amount left, zone right, repeats bracketed */
+.wo-sec{padding:12px 0 10px;border-top:.5px solid var(--sep);}
+.wo-sec:first-child{border-top:0;}
+.wo-sh{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:4px;}
+.wo-st{font-size:13px;font-weight:600;color:var(--ink-3);font-variant-numeric:tabular-nums;}
+.wo-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:5px 0;font-size:15.5px;line-height:1.35;color:var(--ink-2);}
+.wo-amt{min-width:0;}
+.wo-amt b{font-weight:600;font-variant-numeric:tabular-nums;}
+.wo-row.hard{color:var(--ink);}
+.wo-row.hard .wo-amt b{font-weight:700;}
+.wo-rest{font-size:13.5px;color:var(--ink-3);white-space:nowrap;}
+.wo-z{display:inline-flex;align-items:center;gap:7px;flex:none;white-space:nowrap;font-size:14.5px;}
+.wo-row.hard .wo-z{font-weight:600;}
+.wo-z i{flex:none;width:6px;border-radius:2px;background:var(--acc);}
+.wo-z .ef1{height:6px;} .wo-z .ef2{height:8px;} .wo-z .ef3{height:11px;} .wo-z .ef4{height:13px;} .wo-z .ef5{height:15px;}
+.wo-rep{display:flex;align-items:center;gap:8px;margin:3px 0;}
+.wo-n{flex:none;min-width:26px;font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;color:color-mix(in srgb, var(--acc) 85%, var(--ink));}
+.wo-in{flex:1;min-width:0;padding-left:10px;border-left:2px solid color-mix(in srgb, var(--acc) 35%, transparent);}
+.wo-note{font-size:14px;line-height:1.45;color:var(--ink-2);margin-top:6px;}
+.wo-x{padding:12px 0 2px;border-top:.5px solid var(--sep);}
+.wo-x p{font-size:15px;line-height:1.45;margin-top:4px;}
+.wo-tip{margin:10px 0 4px;padding:2px 0 2px 12px;font-size:14.5px;line-height:1.45;color:var(--ink-2);
+  border-left:3px solid color-mix(in srgb, var(--acc) 45%, transparent);}
 .empty-note{text-align:center;padding:30px 10px;font-size:15px;color:var(--ink-2);}
 
 /* list rows — iOS grouped list */
