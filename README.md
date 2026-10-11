@@ -2,7 +2,10 @@
 
 A calm, aesthetic training-plan website for **Harriet Meers** — one continuous build toward a single goal:
 
-- **Ironman 70.3** — 9 May 2027 (1.9 km swim · 90 km bike · 21.1 km run)
+- **Ironman 70.3** — 28 March 2027 (1.9 km swim · 90 km bike · 21.1 km run)
+
+From 12 October 2026 the plan is MyProCoach's *Phil's Intermediate Half Distance Triathlon 24-Week Plan*,
+exactly as it sits in her TrainingPeaks calendar; the summer Foundation and Reset blocks before it stay as they were.
 
 It's a single-page site with a **dynamic calendar**. Tap any day to see the exact sessions, open a
 workout for the full breakdown (sets, paces, drills), tick things off as complete, and jot notes on how
@@ -67,16 +70,21 @@ Your site appears at `https://<your-username>.github.io/harriet-training-plan/` 
 At the top of `data.js`:
 
 ```js
-const PLAN_START  = "2026-07-27";              // Monday of week 1
+const PLAN_START  = "2026-07-27";              // Monday of week 1 of the season (summer block)
 const BLOCK1_END  = "2026-09-27";              // last day of the summer Foundation block
-const DOLOMITES   = ["2026-08-24", "2026-08-27"]; // camp window (assumed — edit!)
-const RACE_703    = "2027-05-09";              // real Apr/May date once known
+const DOLOMITES   = ["2026-08-24", "2026-08-27"]; // camp window
+const PLAN24      = "2026-10-12";              // Monday, week 1 of Phil's 24-week plan
+const RACE_703    = "2027-03-28";              // race day — week 24's Sunday
 ```
 
-- **Dolomites dates are assumed** to be 24–27 August (you'd originally written 24–27 September). Change them to the true window and the camp sessions move automatically.
-- Set `RACE_703` to the real 70.3 date and the whole build/taper re-flows around it.
-- Weekly key sessions for the 9-week block live in the `P1` object; the workout library (`R2`, `S1`,
-  `LOWER`, …) is just below — edit paces, distances or drills there and they update everywhere.
+- **Phil's 24-week plan** lives in the `WEEKS` list: one entry per week, Monday → Sunday, built from a
+  short step notation (`"10m Z2"`, `rep(5, ["15s uZ3", "45s Z2"])`, `"200 FS Z2"`). The same steps
+  produce the text on the site and the structured workout on her watch, so they can't drift apart.
+- The PDF it came from cut most workouts' text short; the missing steps were read off each workout's
+  chart in the PDF. Swim sets are rebuilt from their charts and say so on the site.
+- **`RUN_THR`** is her threshold run pace (seconds per km) behind every run pace on the watch. Update it
+  after each run test (plan weeks 1, 8 and 16) — it's her average pace for the 30-minute effort.
+- The summer block's sessions (`P1`, `R2`, `LOWER`, …) are untouched so her ticks and notes still line up.
 
 ---
 
