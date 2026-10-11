@@ -366,17 +366,23 @@
   }
   function sessionsOfDay(iso) { return dayOf(iso).sessions; }
   function keyFor(iso, idx) { return iso + ":" + idx; }
+  // An optional session (the plan marks a few) only counts once it's done —
+  // skipping one is never a miss, and never breaks a day or a streak.
+  function counts(iso, s, idx) { return s.type !== "rest" && (!s.optional || !!state.done[keyFor(iso, idx)]); }
   function allDone(iso) {
-    const s = sessionsOfDay(iso), real = s.filter(x => x.type !== "rest");
-    if (!real.length) return false;
-    return s.every((x, i) => x.type === "rest" || state.done[keyFor(iso, i)]);
+    const s = sessionsOfDay(iso);
+    if (!s.some(x => x.type !== "rest" && !x.optional)) return false;
+    return s.every((x, i) => x.type === "rest" || x.optional || state.done[keyFor(iso, i)]);
   }
   function isMissed(iso) {
     if (iso >= today || iso < TP.PLAN_START) return false;
-    const real = sessionsOfDay(iso).filter(x => x.type !== "rest");
-    if (!real.length) return false;
+    if (!sessionsOfDay(iso).some(x => x.type !== "rest" && !x.optional)) return false;
     return !allDone(iso);
   }
+  const fullDate = iso => { const d = TP.parse(iso); return d.getDate() + " " + MON_ABBR[d.getMonth()] + " " + d.getFullYear(); };
+  const PLAN_SPAN = "Plan runs " + fullDate(TP.PLAN_START) + " → " + fullDate(TP.RACE_703);
+  // " · Week 3 of 24" in Phil's plan, " · Week 3" in the summer block
+  function weekTxt(day, short) { return day.weekNum ? (short ? " · Wk " : " · Week ") + day.weekNum + (day.weekOf ? " of " + day.weekOf : "") : ""; }
   function mondayOf(iso) { return TP.addDays(iso, -TP.weekdayMon0(iso)); }
   // drop the "Run — " prefix, unless what's left only makes sense with it ("Bike — easy")
   function shortTitle(t) {
@@ -469,7 +475,7 @@
     const day = dayOf(today), dt = TP.parse(today), h = new Date().getHours();
     $("greeting").textContent = (h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening") + ", Harriet";
     $("heroDate").textContent = day.dayName + " " + dt.getDate() + " " + MONTHS[dt.getMonth()];
-    $("heroPhase").textContent = day.phase.label + (day.weekNum ? " · Week " + day.weekNum : "");
+    $("heroPhase").textContent = day.phase.label + weekTxt(day);
     const race = nextRaceInfo();
     $("heroCountdown").textContent = race ? TP.daysBetween(today, race.iso) : "🎉";
 
@@ -524,6 +530,15 @@
     el.querySelector(".hs-no").addEventListener("click", () => { try { localStorage.setItem("htp_sugg", today); } catch (e) { /* ignore */ } el.hidden = true; });
   }
 
+  // MyProCoach's reading for the day, as the plan schedules it
+  function tipsCard(tips) {
+    if (!tips || !tips.length) return "";
+    return '<div class="card list tips"><div class="list-cap">From your coach</div>' + tips.map(t =>
+      '<a class="row tip-row" href="' + esc(t.url) + '" target="_blank" rel="noopener">' +
+        '<span class="row-icon">📖</span><span class="row-main"><span class="row-title">' + esc(t.title) + '</span>' +
+        '<span class="row-sub">MyProCoach training tip</span></span>' + CHEV_SVG + '</a>').join("") + '</div>';
+  }
+
   // the one instruction that matters, so the card stays short
   function mainStep(s) {
     const b = (s.blocks || []).filter(x => x.label === "Main")[0] || (s.blocks || [])[0];
@@ -533,14 +548,14 @@
   function renderTodaySessions() {
     const wrap = $("todaySessions");
     const sessions = sessionsOfDay(today);
-    const real = sessions.filter(s => s.type !== "rest");
+    const real = sessions.filter((s, i) => counts(today, s, i));
     const doneCount = sessions.filter((s, i) => s.type !== "rest" && state.done[keyFor(today, i)]).length;
     $("todayMeta").textContent = real.length ? doneCount + " of " + real.length + " done" : "";
 
     if (!sessions.length) {
       wrap.innerHTML = '<article class="tcard card t-rest" style="--acc:var(--c-rest)"><div class="tc-top"><div class="tc-badge">🌙</div>' +
         '<div class="tc-meta"><div class="tc-type">Off plan</div><h3>Nothing scheduled</h3>' +
-        pills(["Plan runs 27 Jul 2026 → 9 May 2027"], col("rest")) + '</div></div></article>';
+        pills([PLAN_SPAN], col("rest")) + '</div></div></article>';
       return;
     }
 
@@ -559,6 +574,7 @@
       '</article>';
     }).join("");
 
+    wrap.innerHTML += tipsCard(dayOf(today).tips);
     const extra = extrasOn(today);
     if (extra.length) wrap.innerHTML += '<div class="card list extras"><div class="list-cap">Also on your watch today</div>' + extra.map(a => actRow(a, false)).join("") + '</div>';
 
@@ -588,14 +604,15 @@
     let done = 0, total = 0, html = "";
     for (let i = 0; i < 7; i++) {
       const d = TP.addDays(monday, i), dt = TP.parse(d);
-      const ss = sessionsOfDay(d), real = ss.filter(x => x.type !== "rest");
+      const ss = sessionsOfDay(d), planned = ss.filter(x => x.type !== "rest"), real = ss.filter((x, j) => counts(d, x, j));
       const dn = ss.filter((x, j) => x.type !== "rest" && state.done[keyFor(d, j)]).length;
       done += dn; total += real.length;
-      const st = !real.length ? "rest" : (dn === real.length ? "done" : (d < today ? "missed" : "todo"));
-      const xs = extrasOn(d).slice(0, Math.max(0, 4 - Math.min(3, real.length)))
+      const st = !planned.length ? "rest" : !real.length ? (d < today ? "rest" : "todo")
+        : (dn === real.length ? "done" : (d < today ? "missed" : "todo"));
+      const xs = extrasOn(d).slice(0, Math.max(0, 4 - Math.min(3, planned.length)))
         .map(a => '<i class="xdot" style="--acc:' + col(actType(a)) + '"></i>').join("");
-      const dots = (real.length
-        ? real.slice(0, 3).map(x => '<i style="background:' + col(x.type) + '"></i>').join("")
+      const dots = (planned.length
+        ? planned.slice(0, 3).map(x => '<i style="background:' + col(x.type) + '"></i>').join("")
         : (xs ? "" : '<i class="rest-dot"></i>')) + xs;
       html += '<button class="rh-day ' + st + (d === today ? " is-today" : "") + '" data-iso="' + d + '" aria-label="' + DOW_FULL[i] + " " + dt.getDate() + '">' +
         '<span class="rh-dow">' + DOW[i][0] + '</span><span class="rh-num">' + dt.getDate() + '</span><span class="rh-dots">' + dots + '</span></button>';
@@ -855,7 +872,7 @@
     for (let i = 0; i < 7; i++) {
       const d = TP.addDays(monday, i);
       sessionsOfDay(d).forEach((s, idx) => {
-        if (s.type === "rest") return;
+        if (!counts(d, s, idx)) return;
         const done = !!state.done[keyFor(d, idx)];
         out.push({ iso: d, idx: idx, s: s, status: done ? "done" : (d < today ? "missed" : "upcoming") });
       });
@@ -1008,9 +1025,9 @@
   }
 
   // ---------- swim pace (CSS) ----------
-  // CSS = (400 m time − 200 m time) ÷ 2, per 100 m. The plan schedules a test
-  // every six weeks over the winter; when one has a watch swim attached, its laps
-  // are checked for the 400 and the 200, and every CSS target updates from it.
+  // CSS = (400 m time − 200 m time) ÷ 2, per 100 m. Phil's plan has a test in
+  // weeks 1, 8 and 16; when one has a watch swim attached, its laps are checked
+  // for the 400 and the 200, and every CSS target updates from it.
   function cssify(text) {
     if (!state.css || !state.css.s) return text;
     return String(text).replace(/\bCSS\b(?!\s*(?:test|\/|·))/g, "CSS (" + TP.fmtPace(state.css.s) + "/100m)");
@@ -1050,7 +1067,7 @@
     $("cssSrc").textContent = c ? (c.src === "test" ? "Auto" : "Manual") : "";
     $("cssSrc").hidden = !c;
     $("cssFoot").textContent = (next ? "Next test " + DOW[TP.weekdayMon0(next)] + " " + prettyDate(next) + " — swim it with the watch and this updates itself. " : "") +
-      (c ? "Endurance sets on her watch now target " + TP.fmtPace(c.s + 3) + "–" + TP.fmtPace(c.s + 6) + " /100m." : "Until then, swims go to the watch without pace targets.");
+      (c ? "Z2 swims on her watch now target " + TP.fmtPace(c.s + 9) + "–" + TP.fmtPace(c.s + 12) + " /100m, threshold (Z4) sets " + TP.fmtPace(c.s - 1) + "–" + TP.fmtPace(c.s + 2) + "." : "Until then, swims go to the watch without pace targets.");
   }
   function parseClock(t) {
     const m = String(t || "").trim().match(/^(\d{1,2})[:.](\d{2})$/);
@@ -1136,10 +1153,11 @@
       const d = TP.addDays(monday, i);
       sessionsOfDay(d).forEach((x, idx) => {
         if (x.type === "rest") return;
+        const z = TP.zoneSplit(x);   // planned easy / hard minutes
+        easyPlan += z[0]; hardPlan += z[1];
+        if (!counts(d, x, idx)) return;
         total++;
-        const it = TP.intensityOf(x);
         if (state.done[keyFor(d, idx)]) done++;
-        if (it === "easy") easyPlan++; else if (it === "hard") hardPlan++;
       });
     }
     return { done, total, easyPlan, hardPlan };
@@ -1154,7 +1172,7 @@
       if (cursor < TP.PLAN_START) break;
       const ss = sessionsOfDay(cursor);
       if (!ss.length) { cursor = TP.addDays(cursor, -1); continue; }
-      const ok = ss.every((x, idx) => x.type === "rest" || state.done[keyFor(cursor, idx)]);
+      const ok = ss.every((x, idx) => x.type === "rest" || x.optional || state.done[keyFor(cursor, idx)]);
       if (ok) { streak++; cursor = TP.addDays(cursor, -1); } else break;
     }
     $("stat-total").textContent = totalDone;
@@ -1185,12 +1203,11 @@
     const wrap = $("coachNote");
     const lwMon = TP.addDays(mondayOf(anchorDay), -7), lw = weekAgg(lwMon);
     const lwPast = lwMon >= TP.PLAN_START && lwMon < today;
-    const block = TP.currentBlock(today);
     let cls = "", msg = "";
     if (streak >= 5) { cls = "fire"; msg = streak + " days in a row — you're flying, H. Keep stacking them 🔥"; }
     else if (lwPast && lw.total && lw.done / lw.total < 0.5) { msg = "Last week was lighter — zero guilt. We ease back in; consistency beats any one session."; }
     else if (pct >= 80 && wk.total) { msg = "This week's basically in the bag. Seriously proud of you."; }
-    else if (block === "recovery") { msg = "Reset weeks are part of the plan, not a break from it. Enjoy the easy stuff — you earned it."; }
+    else if (dayOf(today).easyWeek) { msg = "Easy weeks are part of the plan, not a break from it. Enjoy them — you earned it."; }
     else if (wk.total) { msg = "One session at a time. Tick today off and the week takes care of itself."; }
     else { wrap.hidden = true; return; }
     wrap.className = "bf-note " + cls; wrap.hidden = false;
@@ -1321,9 +1338,9 @@
     el.hidden = false;
     const day = dayOf(selIso);
     const head = '<div class="peek-head"><h3>' + relDay(selIso).replace(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/, DOW_FULL[TP.weekdayMon0(selIso)]) + ', ' + prettyDate(selIso) + '</h3>' +
-      '<span>' + (day.sessions.length ? esc(day.phase.label) + (day.weekNum ? " · Wk " + day.weekNum : "") : "") + '</span></div>';
+      '<span>' + (day.sessions.length ? esc(day.phase.label + weekTxt(day, true)) : "") + '</span></div>';
     if (!day.sessions.length) {
-      el.innerHTML = head + '<div class="card list"><div class="row"><span class="row-main"><span class="row-title">Nothing planned</span>' + pills(["Plan runs 27 Jul 2026 → 9 May 2027"]) + '</span></div>' + extraRows(selIso, "row") + '</div>';
+      el.innerHTML = head + '<div class="card list"><div class="row"><span class="row-main"><span class="row-title">Nothing planned</span>' + pills([PLAN_SPAN]) + '</span></div>' + extraRows(selIso, "row") + '</div>';
       return;
     }
     const xs = extrasOn(selIso);
@@ -1343,13 +1360,13 @@
       if (!day.sessions.length) continue;
       html += '<div class="ag-day' + (iso === today ? " is-today" : "") + '" id="ag-' + iso + '">' +
         '<div class="ag-date"><b>' + relDay(iso) + " " + d + '</b>' +
-        '<span>' + (day.weekNum ? "Week " + day.weekNum : esc(day.phase.label)) + '</span>' +
+        '<span>' + (day.weekNum ? weekTxt(day).slice(3) : esc(day.phase.label)) + '</span>' +
         (day.events.length ? '<span class="ag-ev">' + esc(day.events.join(" · ")) + '</span>' : '') + '</div>' +
         sessionRows(iso, "ag-sess").replace(/class="ag-sess"/g, 'class="ag-sess" data-open role="button" tabindex="0"') +
         extraRows(iso, "ag-sess") +
       '</div>';
     }
-    body.innerHTML = html || '<p class="empty-note">No sessions this month — the plan runs 27 Jul 2026 → 9 May 2027.</p>';
+    body.innerHTML = html || '<p class="empty-note">No sessions this month — ' + esc(PLAN_SPAN.replace(/^Plan/, "the plan")) + '.</p>';
     wireRows(body);
   }
 
@@ -1445,7 +1462,7 @@
     currentIso = isoStr;
     const day = dayOf(isoStr), dt = TP.parse(isoStr);
     $("d-phase").textContent = day.sessions.length
-      ? day.phase.label + (day.weekNum ? " · Week " + day.weekNum : "") + (day.swapped ? " · swapped" : "")
+      ? day.phase.label + weekTxt(day) + (day.swapped ? " · swapped" : "")
       : "Off plan";
     $("d-title").textContent = relDay(isoStr) === "Today" ? "Today" : day.dayName;
     $("d-date").textContent = (relDay(isoStr) === "Today" ? day.dayName + " " : "") + prettyDate(isoStr, true);
@@ -1467,11 +1484,12 @@
           (!isRest ? '<button class="check-hit d-chk" data-idx="' + idx + '" aria-label="Mark done"><span class="check' + (done ? " on" : "") + '">' + CHECK_SVG + '</span></button>' : '') +
         '</div>' + stripFor(isoStr, idx);
       if (hasDetail) {
-        html += '<div class="sess-detail">' + steps(s.blocks, col(s.type)) + '</div>' +
+        html += '<div class="sess-detail">' + steps(s.blocks, col(s.type)) + (s.est ? '<p class="sess-est">' + esc(s.est) + '</p>' : '') + '</div>' +
           '<button class="sess-toggle"><span class="st-l">' + (open ? "Hide workout" : "Show full workout") + '</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>';
       }
       html += '</div>';
     });
+    html += tipsCard(day.tips);
     const xs = extrasOn(isoStr);
     if (xs.length) html += '<div class="card list extras"><div class="list-cap">Also on the watch</div>' + xs.map(a => actRow(a, false)).join("") + '</div>';
     html += '<div class="notes-wrap"><label for="d-notes">Notes</label>' +
