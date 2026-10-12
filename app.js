@@ -1322,6 +1322,26 @@
   // ---------- PLAN: month grid ----------
   function renderPlan() { renderCalendar(); renderDayPeek(); if (calMode === "list") renderAgenda(); }
 
+  // Each day in a month grid says what it is in a word — "Swim", "Bike", "Rest" —
+  // so the shape of the month reads at a glance. A cell is ~45px wide on a phone,
+  // hence the short labels. Dashed = optional, outlined "+" = an extra from the watch.
+  const CHIP_LABEL = { strength: "Gym", mobility: "Mobility", other: "Other" };
+  const chipLabel = type => CHIP_LABEL[type] || meta(type).label;
+  function dayChips(iso, withExtras) {
+    const day = dayOf(iso), real = day.sessions.filter(s => s.type !== "rest");
+    const chip = (type, cls, txt) => '<span class="cchip' + cls + '" style="--acc:' + col(type) + '">' + txt + '</span>';
+    const out = day.sessions.length && !real.length ? [chip("rest", " rest", "Rest")]
+      : real.map(s => chip(s.type, s.optional ? " opt" : "", chipLabel(s.type)));
+    if (withExtras) extrasOn(iso).forEach(a => out.push(chip(actType(a), " xtra", "+" + chipLabel(actType(a)))));
+    return out.length > 3 ? out.slice(0, 2).join("") + '<span class="cchip more">+' + (out.length - 2) + '</span>' : out.join("");
+  }
+  // "Swim and bike", for screen readers
+  function daySummary(iso) {
+    const ts = sessionsOfDay(iso).filter(s => s.type !== "rest").map(s => meta(s.type).label + (s.optional ? " (optional)" : ""));
+    if (!ts.length) return sessionsOfDay(iso).length ? "rest day" : "";
+    return ts.length > 1 ? ts.slice(0, -1).join(", ") + " and " + ts[ts.length - 1] : ts[0];
+  }
+
   function renderCalendar(dir) {
     const y = view.getFullYear(), m = view.getMonth();
     $("cal-title").textContent = MONTHS[m] + " " + y;
@@ -1341,11 +1361,9 @@
       if (allDone(iso)) cls.push("all-done"); else if (isMissed(iso)) cls.push("missed");
       if (day.swapped) cls.push("swapped");
       if (focusRace && day.sessions.length) cls.push(isKeyDay(iso, day) ? "focus" : "dim");
-      const xs = extrasOn(iso);
-      const dots = real.slice(0, 3).map(s => '<i style="background:' + col(s.type) + '"></i>').join("") +
-        xs.slice(0, Math.max(0, 4 - Math.min(3, real.length))).map(a => '<i class="xdot" style="--acc:' + col(actType(a)) + '"></i>').join("");
-      html += '<button class="' + cls.join(" ") + '" data-iso="' + iso + '" aria-label="' + prettyDate(iso) + (real.length ? ", " + real.length + " session" + (real.length > 1 ? "s" : "") : "") + (xs.length ? ", " + xs.length + " extra workout" + (xs.length > 1 ? "s" : "") : "") + '">' +
-        '<span class="dnum">' + d + '</span><span class="cdots">' + dots + '</span></button>';
+      const xs = extrasOn(iso), sum = daySummary(iso);
+      html += '<button class="' + cls.join(" ") + '" data-iso="' + iso + '" aria-label="' + prettyDate(iso) + (sum ? ", " + sum : "") + (xs.length ? ", " + xs.length + " extra workout" + (xs.length > 1 ? "s" : "") : "") + '">' +
+        '<span class="dnum">' + d + '</span><span class="cchips">' + dayChips(iso, true) + '</span></button>';
     }
     grid.innerHTML = html;
     grid.classList.remove("slide-l", "slide-r");
@@ -1498,11 +1516,11 @@
     let cells = "";
     for (let i = 0; i < pad; i++) cells += '<span class="mg-cell empty"></span>';
     for (let d = 1; d <= dim; d++) {
-      const dISO = TP.iso(new Date(y, m, d, 12));
-      const has = sessionsOfDay(dISO).filter(s => s.type !== "rest").length > 0;
-      if (dISO === isoStr) cells += '<span class="mg-cell self">' + d + '</span>';
-      else if (has) cells += '<button class="mg-cell has" data-iso="' + dISO + '">' + d + '</button>';
-      else cells += '<span class="mg-cell none">' + d + '</span>';
+      // any planned day is a target — moving a session onto a rest day is the usual swap
+      const dISO = TP.iso(new Date(y, m, d, 12)), inner = '<b>' + d + '</b><span class="cchips">' + dayChips(dISO) + '</span>';
+      if (dISO === isoStr) cells += '<span class="mg-cell self">' + inner + '</span>';
+      else if (sessionsOfDay(dISO).length) cells += '<button class="mg-cell has" data-iso="' + dISO + '" aria-label="' + prettyDate(dISO) + ', ' + daySummary(dISO) + '">' + inner + '</button>';
+      else cells += '<span class="mg-cell none"><b>' + d + '</b></span>';
     }
     picker.innerHTML =
       '<div class="sp-label">Pick a day to swap the whole day with:</div>' +
@@ -1734,9 +1752,10 @@
   })();
 
   (function legend() {
-    $("legend").innerHTML = Object.keys(TP.TYPE_META).filter(t => t !== "rest")
-      .map(t => '<span><i class="dot" style="background:' + col(t) + '"></i>' + TP.TYPE_META[t].label + '</span>').join("") +
-      '<span><i class="dot xdot" style="--acc:var(--ink-3)"></i>Extra workout</span>';
+    // the chips name themselves, so the key only explains their two styles
+    $("legend").innerHTML =
+      '<span><span class="cchip opt" style="--acc:' + col("bike") + '">Bike</span>Optional</span>' +
+      '<span><span class="cchip xtra" style="--acc:' + col("run") + '">+Run</span>Extra from her watch</span>';
   })();
 
   // ---------- splash: cinematic landing ----------
