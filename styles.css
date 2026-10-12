@@ -589,12 +589,18 @@ textarea::placeholder{color:var(--ink-3);}
 .grid.slide-r{animation:slideR .28s var(--ease);}
 @keyframes slideL{from{opacity:0;transform:translateX(24px);}to{opacity:1;transform:none;}}
 @keyframes slideR{from{opacity:0;transform:translateX(-24px);}to{opacity:1;transform:none;}}
-.cell{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px 0 6px;min-height:52px;border-radius:12px;position:relative;}
+.cell{display:flex;flex-direction:column;align-items:center;gap:3px;padding:3px 0 6px;min-height:70px;border-radius:12px;position:relative;}
 .cell.empty{pointer-events:none;}
-.dnum{position:relative;width:34px;height:34px;display:grid;place-items:center;border-radius:50%;font-size:17px;font-weight:500;font-variant-numeric:tabular-nums;}
+.dnum{position:relative;width:30px;height:30px;flex:none;display:grid;place-items:center;border-radius:50%;font-size:16px;font-weight:500;font-variant-numeric:tabular-nums;}
 .cell.off .dnum{color:var(--ink-3);opacity:.5;}
-.cdots{display:flex;gap:3px;height:6px;}
-.cdots i{width:5px;height:5px;border-radius:50%;}
+/* day summary chips — "Swim", "Bike", "Rest" — shared by the month grid and the swap picker */
+.cchips{display:flex;flex-direction:column;gap:2px;width:100%;padding:0 2px;}
+.cchip{display:block;height:15px;line-height:15px;border-radius:5px;font-size:10px;font-weight:650;letter-spacing:-.01em;text-align:center;
+  white-space:nowrap;overflow:hidden;color:color-mix(in srgb,var(--acc) 72%,var(--ink));background:color-mix(in srgb,var(--acc) 16%,transparent);}
+.cchip.opt{line-height:13px;background:color-mix(in srgb,var(--acc) 6%,transparent);border:1px dashed color-mix(in srgb,var(--acc) 60%,transparent);}
+.cchip.xtra{line-height:13px;background:none;border:1px solid color-mix(in srgb,var(--acc) 50%,transparent);}
+.cchip.rest,.cchip.more{background:none;color:var(--ink-3);font-weight:500;}
+.legend .cchip{width:auto;padding:0 6px;}
 .cell.rest-day .dnum{color:var(--ink-3);}
 .cell.all-done .dnum{background:var(--good-soft);color:var(--good);font-weight:700;}
 .cell.missed .dnum{color:var(--bad);}
@@ -606,7 +612,7 @@ textarea::placeholder{color:var(--ink-3);}
 .cell.dim{opacity:.25;}
 .cell.focus .dnum{box-shadow:inset 0 0 0 2px var(--accent);}
 .legend{display:flex;flex-wrap:wrap;justify-content:center;gap:6px 12px;margin-top:12px;padding-top:10px;border-top:.5px solid var(--sep);font-size:12px;color:var(--ink-2);}
-.legend span{display:flex;align-items:center;gap:5px;}
+.legend > span{display:flex;align-items:center;gap:6px;}
 
 /* selected-day peek under the calendar */
 .day-peek{margin-top:12px;}
@@ -757,13 +763,16 @@ textarea::placeholder{color:var(--ink-3);}
 .sp-label{font-size:14px;color:var(--ink-2);margin-bottom:10px;}
 .mg-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
 .mg-title{font-weight:700;font-size:16px;}
-.mg-dow,.mg-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center;}
+.mg-dow,.mg-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center;}
 .mg-dow span{font-size:11.5px;font-weight:600;color:var(--ink-3);padding-bottom:4px;}
-.mg-cell{height:40px;display:grid;place-items:center;border-radius:12px;font-size:15px;font-variant-numeric:tabular-nums;}
+.mg-cell{min-height:62px;display:flex;flex-direction:column;align-items:center;gap:3px;padding:5px 0 6px;border-radius:12px;font-size:15px;font-variant-numeric:tabular-nums;}
+.mg-cell b{font-weight:inherit;line-height:20px;}
+.mg-cell .cchips{padding:0 1px;}
 .mg-cell.has{background:var(--fill-2);font-weight:600;}
 .mg-cell.has:active{background:var(--accent);color:#fff;}
 .mg-cell.none{color:var(--ink-3);opacity:.5;}
 .mg-cell.self{background:var(--accent);color:#fff;font-weight:700;}
+.mg-cell.self .cchip,.mg-cell.has:active .cchip{color:#fff;background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.6);}
 
 /* ============================================================
    PIN
@@ -869,7 +878,7 @@ textarea::placeholder{color:var(--ink-3);}
 .row-act{display:block;margin-top:5px;font-size:13px;font-weight:600;color:var(--good);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .list-cap{font-size:13px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;padding:12px 16px 2px;}
 .extras{margin-top:12px;}
-.cdots .xdot,.rh-dots .xdot,.dot.xdot{background:transparent !important;box-shadow:inset 0 0 0 1.5px var(--acc);}
+.rh-dots .xdot,.dot.xdot{background:transparent !important;box-shadow:inset 0 0 0 1.5px var(--acc);}
 
 /* ============================================================
    PLAN: on her watch
