@@ -603,7 +603,24 @@ svg{display:block;}
 .pop{animation:pop .4s var(--spring);}
 
 /* ---------- this week ---------- */
-.week{padding:10px 8px 8px;}
+.week{padding:0;}
+.week-vp{overflow:hidden;border-radius:inherit;touch-action:pan-y;user-select:none;-webkit-user-select:none;}
+.week-track{display:flex;transform:translate3d(-100%,0,0);will-change:transform;}
+.week-pane{flex:0 0 100%;min-width:0;padding:10px 8px 8px;}
+.week-vp.dragging .rh-day{transform:none;}
+.wk-head{align-items:center;}
+.wk-title{display:flex;align-items:baseline;gap:8px;min-width:0;}
+.wk-title h2{white-space:nowrap;}
+.wk-back{align-self:center;font-size:12.5px;font-weight:700;color:var(--accent);background:var(--accent-soft);padding:4px 10px;border-radius:99px;}
+.wk-back[hidden]{display:none;}
+.wk-right{display:flex;align-items:center;gap:10px;min-width:0;}
+.wk-right .sec-meta{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wk-nav{display:none;gap:6px;}
+.wk-nav .round-btn{width:30px;height:30px;}
+.wk-nav .round-btn svg{width:15px;height:15px;}
+.wk-nav .round-btn:disabled{opacity:.35;}
+@media (hover:hover) and (pointer:fine){.wk-nav{display:flex;}}
+.wv b small{font-size:12px;font-weight:600;color:var(--ink-3);margin-left:2px;}
 .rhythm{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
 .rh-day{display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 0 10px;border-radius:18px;min-height:78px;}
 .rh-dow{font-size:11px;font-weight:700;color:var(--ink-3);text-transform:uppercase;letter-spacing:.04em;}

@@ -679,8 +679,16 @@
   }
   const swimTxt = m => m >= 1000 ? (m / 1000).toFixed(1) + " km" : Math.round(m) + " m";
 
-  function renderWeek() {
-    const el = $("rhythm"), monday = mondayOf(anchorDay);
+  // ---------- the week strip: swipe left/right through the whole season ----------
+  // weekOff counts weeks from the current one. The track always holds three panes
+  // (last, this, next week); a swipe slides it a pane over, then it's re-rendered
+  // around the new week and snapped back to the middle without a transition.
+  let weekOff = 0;
+  const WK_FIRST = mondayOf(TP.PLAN_START), WK_LAST = mondayOf(TP.RACE_703);
+  const weekMonday = off => TP.addDays(mondayOf(anchorDay), off * 7);
+  const weekExists = off => { const m = weekMonday(off); return m >= WK_FIRST && m <= WK_LAST; };
+
+  function weekDays(monday) {
     let done = 0, total = 0, html = "";
     for (let i = 0; i < 7; i++) {
       const d = TP.addDays(monday, i), dt = TP.parse(d);
@@ -697,19 +705,172 @@
       html += '<button class="rh-day ' + st + (d === today ? " is-today" : "") + '" data-iso="' + d + '" aria-label="' + DOW_FULL[i] + " " + dt.getDate() + '">' +
         '<span class="rh-dow">' + DOW[i][0] + '</span><span class="rh-num">' + dt.getDate() + '</span><span class="rh-dots">' + dots + '</span></button>';
     }
-    el.innerHTML = html;
-    el.querySelectorAll(".rh-day").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
-    // in the catch-up week everything is a bonus, so there's no "of"
-    $("rhythmLabel").textContent = dayOf(monday).phase.label === "Catch-up week" ? (done ? done + " done · bonus week" : "Bonus week")
-      : total ? done + " of " + total + " done" : "";
+    return { html, done, total };
+  }
 
-    // what the watch recorded this week — hidden until there's anything to show
-    const wk = sumWeek(monday), vol = $("weekVol");
-    vol.hidden = !wk.n;
+  // what the watch recorded that week — or, for a week still to come, what's planned
+  function weekVol(monday) {
     const v = (type, label, val) => '<div class="wv"><span class="wv-l"><i class="dot" style="background:' + col(type) + '"></i>' + label + '</span><b>' + val + '</b></div>';
-    vol.innerHTML = v("swim", "Swim", swimTxt(wk.swim)) + v("bike", "Bike", Math.round(wk.bike / 1000) + " km") +
+    if (monday > mondayOf(today)) {
+      const n = { swim: 0, bike: 0, run: 0 }; let mins = 0;
+      for (let i = 0; i < 7; i++) {
+        sessionsOfDay(TP.addDays(monday, i)).forEach(s => {
+          if (s.type === "rest" || s.optional) return;
+          if (n[s.type] !== undefined) n[s.type]++;
+          const z = TP.zoneSplit(s); mins += z[0] + z[1];
+        });
+      }
+      const c = k => n[k] + "<small>" + (n[k] === 1 ? "session" : "sessions") + "</small>";
+      return v("swim", "Swim", c("swim")) + v("bike", "Bike", c("bike")) + v("run", "Run", c("run")) + v("rest", "Planned", fmtDur(mins * 60) || "—");
+    }
+    const wk = sumWeek(monday);
+    return v("swim", "Swim", swimTxt(wk.swim)) + v("bike", "Bike", Math.round(wk.bike / 1000) + " km") +
       v("run", "Run", (wk.run / 1000).toFixed(1) + " km") + v("rest", "Time", fmtDur(wk.secs) || "0 min");
   }
+
+  function weekPane(off) {
+    if (!weekExists(off)) return '<div class="week-pane" aria-hidden="true"></div>';
+    const monday = weekMonday(off);
+    return '<div class="week-pane"' + (off === weekOff ? "" : ' aria-hidden="true"') + '><div class="rhythm">' + weekDays(monday).html +
+      '</div><div class="week-vol">' + weekVol(monday) + '</div></div>';
+  }
+
+  function weekHead(off, dir) {
+    const monday = weekMonday(off), cur = mondayOf(today), rel = Math.round(TP.daysBetween(cur, monday) / 7);
+    const a = TP.parse(monday), b = TP.parse(TP.addDays(monday, 6));
+    const range = a.getDate() + (a.getMonth() === b.getMonth() ? "" : " " + MON_ABBR[a.getMonth()]) + " – " + b.getDate() + " " + MON_ABBR[b.getMonth()];
+    const title = rel === 0 ? "This week" : rel === 1 ? "Next week" : rel === -1 ? "Last week" : range;
+    const phase = dayOf(monday).phase.label, w = weekDays(monday);
+    // in the catch-up week everything is a bonus, so there's no "of"
+    const meta = phase === "Catch-up week" ? (w.done ? w.done + " done · bonus week" : "Bonus week")
+      : rel > 0 ? phase
+      : w.total ? w.done + " of " + w.total + " done" : "";
+    const t = $("weekTitle"), changed = t.textContent !== title;
+    t.textContent = title;
+    $("rhythmLabel").textContent = meta;
+    $("weekBack").hidden = rel === 0;
+    $("wkPrev").disabled = !weekExists(off - 1);
+    $("wkNext").disabled = !weekExists(off + 1);
+    if (changed && dir && t.animate && !REDUCED()) {
+      t.animate([{ opacity: 0, transform: "translateX(" + dir * 10 + "px)" }, { opacity: 1, transform: "none" }],
+        { duration: 280, easing: "cubic-bezier(.22,.8,.28,1)" });
+    }
+  }
+  const REDUCED = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function renderWeek() {
+    if (!weekExists(weekOff)) weekOff = 0;
+    $("weekTrack").innerHTML = weekPane(weekOff - 1) + weekPane(weekOff) + weekPane(weekOff + 1);
+    weekHead(weekOff);
+  }
+
+  const weekNav = (function weekSwipe() {
+    const vp = $("weekVp"), track = $("weekTrack");
+    const EASE = "cubic-bezier(.22,.8,.28,1)";
+    let pid = null, mode = 0, x0 = 0, y0 = 0, startPx = 0, px = 0, moved = false, samples = [];
+    let anim = null;   // { dir, timer } while a slide is running
+
+    function place(p, ms) {
+      track.style.transition = ms ? "transform " + Math.round(ms) + "ms " + EASE : "none";
+      track.style.transform = "translate3d(calc(-100% + " + p + "px),0,0)";
+    }
+    // where the track sits right now, relative to its resting spot (mid-animation too)
+    function currentPx() {
+      const m = getComputedStyle(track).transform;
+      if (!m || m === "none") return 0;
+      const tx = new DOMMatrixReadOnly(m).m41;
+      return tx + vp.clientWidth;
+    }
+    function settle() {
+      if (!anim) return;
+      clearTimeout(anim.timer);
+      const dir = anim.dir; anim = null;
+      if (dir) { weekOff += dir; renderWeek(); }
+      place(0, 0);
+    }
+    function slide(dir, from, v) {
+      const w = vp.clientWidth;
+      if (dir && !weekExists(weekOff + dir)) dir = 0;
+      const to = -dir * w, rem = Math.abs(to - from);
+      let ms = dir ? (Math.abs(v) > 0.2 ? 3.4 * rem / Math.abs(v) : 440 * rem / w) : 260 + 120 * rem / w;
+      ms = Math.max(dir ? 240 : 200, Math.min(dir ? 480 : 380, ms));
+      if (REDUCED()) ms = Math.min(ms, 160);
+      if (dir) weekHead(weekOff + dir, dir);
+      if (rem < 1) { anim = { dir }; settle(); return; }
+      place(from, 0);
+      track.getBoundingClientRect();   // commit the start position before transitioning
+      place(to, ms);
+      anim = { dir, timer: setTimeout(settle, ms + 80) };
+    }
+    track.addEventListener("transitionend", e => { if (e.target === track && anim) settle(); });
+
+    // grabbing mid-slide: commit the week it was heading to and carry on from where it is
+    function grab() {
+      if (!anim) return 0;
+      const p = currentPx(), dir = anim.dir;
+      settle();
+      const q = p + dir * vp.clientWidth;
+      place(q, 0);
+      return q;
+    }
+
+    vp.addEventListener("pointerdown", e => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      startPx = px = grab();
+      pid = e.pointerId; mode = 0; moved = false;
+      x0 = e.clientX; y0 = e.clientY; samples = [[e.timeStamp, e.clientX]];
+    });
+    vp.addEventListener("pointermove", e => {
+      if (e.pointerId !== pid) return;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      if (mode === 0) {
+        if (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy) * 1.1) {
+          mode = 1; moved = true; vp.classList.add("dragging");
+          try { vp.setPointerCapture(pid); } catch (err) { /* ignore */ }
+        } else if (Math.abs(dy) > 8) { mode = -1; }
+      }
+      if (mode !== 1) return;
+      e.preventDefault();
+      let p = startPx + dx;
+      const w = vp.clientWidth;
+      // nothing beyond the plan's first or race week: let it stretch, not slide
+      if ((p > 0 && !weekExists(weekOff - 1)) || (p < 0 && !weekExists(weekOff + 1))) p = p / (1 + Math.abs(p) / (w * 0.35));
+      px = p; place(px, 0);
+      samples.push([e.timeStamp, e.clientX]);
+      while (samples.length > 2 && e.timeStamp - samples[0][0] > 90) samples.shift();
+    });
+    function release(e) {
+      if (e.pointerId !== pid) return;
+      pid = null; vp.classList.remove("dragging");
+      if (mode !== 1) { if (startPx) slide(0, startPx, 0); return; }
+      const a = samples[0], b = samples[samples.length - 1], dt = b[0] - a[0];
+      const v = e.type === "pointercancel" || dt <= 0 ? 0 : (b[1] - a[1]) / dt;   // px per ms
+      const w = vp.clientWidth;
+      let dir = 0;
+      if (Math.abs(v) > 0.3) dir = v < 0 ? 1 : -1;
+      else if (Math.abs(px) > w * 0.22) dir = px < 0 ? 1 : -1;
+      slide(dir, px, v);
+    }
+    vp.addEventListener("pointerup", release);
+    vp.addEventListener("pointercancel", release);
+    // a drag isn't a tap: don't open the day it started on
+    vp.addEventListener("click", e => {
+      if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; return; }
+      const b = e.target.closest(".rh-day");
+      if (b) openDrawer(b.getAttribute("data-iso"));
+    }, true);
+
+    const go = dir => slide(dir, grab(), 0);
+    $("wkPrev").addEventListener("click", () => go(-1));
+    $("wkNext").addEventListener("click", () => go(1));
+    $("weekBack").addEventListener("click", () => {
+      if (!weekOff) return;
+      // a long way back: jump the panes so the slide still arrives from the right side
+      const dir = weekOff > 0 ? -1 : 1;
+      grab(); weekOff = -dir; renderWeek(); slide(dir, 0, 0);
+    });
+    return { go };
+  })();
 
   function renderLatest() {
     const sec = $("latest"), latest = acts.filter(a => actIso(a) >= TP.PLAN_START).slice(0, 4);
