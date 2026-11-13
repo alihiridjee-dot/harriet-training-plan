@@ -13,12 +13,15 @@ exactly as it sits in her TrainingPeaks calendar; the summer Foundation and Rese
 dropped to make the room: from 28 Dec onwards every session is back on its original date. The two dates
 that control this are `CATCHUP` and `RESTART` at the top of `data.js`.
 
-**Harriet's avatar.** The card at the top of the Today tab is a cartoon Harriet holding up her watch.
-Her outfit, what's in her other hand and the backdrop follow the day — whatever her Garmin recorded, or
-else what the plan has for her (rest, run, bike, swim, strength, mobility, race day). The big watch beside
-her shows the plan on top and what she actually did underneath (the time of day until something is
-recorded), with a ring for how much of today is ticked. Tap the watch for the day's details. She's drawn
-in code — `avatarSvg()` and `AV_LOOK` in `app.js` — so colours and outfits are easy to change.
+**Harriet's avatar.** The top of the Today tab is a full-width scene with a cartoon Harriet in it, and
+she's doing whatever today is: running, riding her bike, swimming, squatting with a dumbbell, stretching,
+or curled up on a beanbag with a brew on a rest day (and crossing a finish line on race day). What she
+does follows whatever her Garmin recorded today, or else what the plan has for her. Tap her and a panel
+slides up with the numbers — the plan, and what's on her watch.
+
+She's drawn and animated in code, in `app.js`: `LOOKS` is what she wears for each activity, `POSES` is how
+she moves (each returns joint angles for a moment in time), `rigScene()` is the backdrop, and the scene's
+sky colours are under `.scene[data-scene=…]` in `styles.css`.
 
 **The surprise (November 2026).** The Today tab carries a jigsaw of wrapping paper over a hidden picture.
 Each new day Harriet opens the site she can tap to crack one piece; on Friday 20 Nov one tap shatters the
