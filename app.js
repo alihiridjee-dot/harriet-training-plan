@@ -1030,8 +1030,16 @@
   }
   const swimTxt = m => m >= 1000 ? (m / 1000).toFixed(1) + " km" : Math.round(m) + " m";
 
-  function renderWeek() {
-    const el = $("rhythm"), monday = mondayOf(anchorDay);
+  // ---------- the week strip: swipe left/right through the whole season ----------
+  // weekOff counts weeks from the current one. The track always holds three panes
+  // (last, this, next week); a swipe slides it a pane over, then it's re-rendered
+  // around the new week and snapped back to the middle without a transition.
+  let weekOff = 0;
+  const WK_FIRST = mondayOf(TP.PLAN_START), WK_LAST = mondayOf(TP.RACE_703);
+  const weekMonday = off => TP.addDays(mondayOf(anchorDay), off * 7);
+  const weekExists = off => { const m = weekMonday(off); return m >= WK_FIRST && m <= WK_LAST; };
+
+  function weekDays(monday) {
     let done = 0, total = 0, html = "";
     for (let i = 0; i < 7; i++) {
       const d = TP.addDays(monday, i), dt = TP.parse(d);
@@ -1048,19 +1056,172 @@
       html += '<button class="rh-day ' + st + (d === today ? " is-today" : "") + '" data-iso="' + d + '" aria-label="' + DOW_FULL[i] + " " + dt.getDate() + '">' +
         '<span class="rh-dow">' + DOW[i][0] + '</span><span class="rh-num">' + dt.getDate() + '</span><span class="rh-dots">' + dots + '</span></button>';
     }
-    el.innerHTML = html;
-    el.querySelectorAll(".rh-day").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
-    // in the catch-up week everything is a bonus, so there's no "of"
-    $("rhythmLabel").textContent = dayOf(monday).phase.label === "Catch-up week" ? (done ? done + " done · bonus week" : "Bonus week")
-      : total ? done + " of " + total + " done" : "";
+    return { html, done, total };
+  }
 
-    // what the watch recorded this week — hidden until there's anything to show
-    const wk = sumWeek(monday), vol = $("weekVol");
-    vol.hidden = !wk.n;
+  // what the watch recorded that week — or, for a week still to come, what's planned
+  function weekVol(monday) {
     const v = (type, label, val) => '<div class="wv"><span class="wv-l"><i class="dot" style="background:' + col(type) + '"></i>' + label + '</span><b>' + val + '</b></div>';
-    vol.innerHTML = v("swim", "Swim", swimTxt(wk.swim)) + v("bike", "Bike", Math.round(wk.bike / 1000) + " km") +
+    if (monday > mondayOf(today)) {
+      const n = { swim: 0, bike: 0, run: 0 }; let mins = 0;
+      for (let i = 0; i < 7; i++) {
+        sessionsOfDay(TP.addDays(monday, i)).forEach(s => {
+          if (s.type === "rest" || s.optional) return;
+          if (n[s.type] !== undefined) n[s.type]++;
+          const z = TP.zoneSplit(s); mins += z[0] + z[1];
+        });
+      }
+      const c = k => n[k] + "<small>" + (n[k] === 1 ? "session" : "sessions") + "</small>";
+      return v("swim", "Swim", c("swim")) + v("bike", "Bike", c("bike")) + v("run", "Run", c("run")) + v("rest", "Planned", fmtDur(mins * 60) || "—");
+    }
+    const wk = sumWeek(monday);
+    return v("swim", "Swim", swimTxt(wk.swim)) + v("bike", "Bike", Math.round(wk.bike / 1000) + " km") +
       v("run", "Run", (wk.run / 1000).toFixed(1) + " km") + v("rest", "Time", fmtDur(wk.secs) || "0 min");
   }
+
+  function weekPane(off) {
+    if (!weekExists(off)) return '<div class="week-pane" aria-hidden="true"></div>';
+    const monday = weekMonday(off);
+    return '<div class="week-pane"' + (off === weekOff ? "" : ' aria-hidden="true"') + '><div class="rhythm">' + weekDays(monday).html +
+      '</div><div class="week-vol">' + weekVol(monday) + '</div></div>';
+  }
+
+  function weekHead(off, dir) {
+    const monday = weekMonday(off), cur = mondayOf(today), rel = Math.round(TP.daysBetween(cur, monday) / 7);
+    const a = TP.parse(monday), b = TP.parse(TP.addDays(monday, 6));
+    const range = a.getDate() + (a.getMonth() === b.getMonth() ? "" : " " + MON_ABBR[a.getMonth()]) + " – " + b.getDate() + " " + MON_ABBR[b.getMonth()];
+    const title = rel === 0 ? "This week" : rel === 1 ? "Next week" : rel === -1 ? "Last week" : range;
+    const phase = dayOf(monday).phase.label, w = weekDays(monday);
+    // in the catch-up week everything is a bonus, so there's no "of"
+    const meta = phase === "Catch-up week" ? (w.done ? w.done + " done · bonus week" : "Bonus week")
+      : rel > 0 ? phase
+      : w.total ? w.done + " of " + w.total + " done" : "";
+    const t = $("weekTitle"), changed = t.textContent !== title;
+    t.textContent = title;
+    $("rhythmLabel").textContent = meta;
+    $("weekBack").hidden = rel === 0;
+    $("wkPrev").disabled = !weekExists(off - 1);
+    $("wkNext").disabled = !weekExists(off + 1);
+    if (changed && dir && t.animate && !REDUCED()) {
+      t.animate([{ opacity: 0, transform: "translateX(" + dir * 10 + "px)" }, { opacity: 1, transform: "none" }],
+        { duration: 280, easing: "cubic-bezier(.22,.8,.28,1)" });
+    }
+  }
+  const REDUCED = () => window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function renderWeek() {
+    if (!weekExists(weekOff)) weekOff = 0;
+    $("weekTrack").innerHTML = weekPane(weekOff - 1) + weekPane(weekOff) + weekPane(weekOff + 1);
+    weekHead(weekOff);
+  }
+
+  const weekNav = (function weekSwipe() {
+    const vp = $("weekVp"), track = $("weekTrack");
+    const EASE = "cubic-bezier(.22,.8,.28,1)";
+    let pid = null, mode = 0, x0 = 0, y0 = 0, startPx = 0, px = 0, moved = false, samples = [];
+    let anim = null;   // { dir, timer } while a slide is running
+
+    function place(p, ms) {
+      track.style.transition = ms ? "transform " + Math.round(ms) + "ms " + EASE : "none";
+      track.style.transform = "translate3d(calc(-100% + " + p + "px),0,0)";
+    }
+    // where the track sits right now, relative to its resting spot (mid-animation too)
+    function currentPx() {
+      const m = getComputedStyle(track).transform;
+      if (!m || m === "none") return 0;
+      const tx = new DOMMatrixReadOnly(m).m41;
+      return tx + vp.clientWidth;
+    }
+    function settle() {
+      if (!anim) return;
+      clearTimeout(anim.timer);
+      const dir = anim.dir; anim = null;
+      if (dir) { weekOff += dir; renderWeek(); }
+      place(0, 0);
+    }
+    function slide(dir, from, v) {
+      const w = vp.clientWidth;
+      if (dir && !weekExists(weekOff + dir)) dir = 0;
+      const to = -dir * w, rem = Math.abs(to - from);
+      let ms = dir ? (Math.abs(v) > 0.2 ? 3.4 * rem / Math.abs(v) : 440 * rem / w) : 260 + 120 * rem / w;
+      ms = Math.max(dir ? 240 : 200, Math.min(dir ? 480 : 380, ms));
+      if (REDUCED()) ms = Math.min(ms, 160);
+      if (dir) weekHead(weekOff + dir, dir);
+      if (rem < 1) { anim = { dir }; settle(); return; }
+      place(from, 0);
+      track.getBoundingClientRect();   // commit the start position before transitioning
+      place(to, ms);
+      anim = { dir, timer: setTimeout(settle, ms + 80) };
+    }
+    track.addEventListener("transitionend", e => { if (e.target === track && anim) settle(); });
+
+    // grabbing mid-slide: commit the week it was heading to and carry on from where it is
+    function grab() {
+      if (!anim) return 0;
+      const p = currentPx(), dir = anim.dir;
+      settle();
+      const q = p + dir * vp.clientWidth;
+      place(q, 0);
+      return q;
+    }
+
+    vp.addEventListener("pointerdown", e => {
+      if (e.pointerType === "mouse" && e.button !== 0) return;
+      startPx = px = grab();
+      pid = e.pointerId; mode = 0; moved = false;
+      x0 = e.clientX; y0 = e.clientY; samples = [[e.timeStamp, e.clientX]];
+    });
+    vp.addEventListener("pointermove", e => {
+      if (e.pointerId !== pid) return;
+      const dx = e.clientX - x0, dy = e.clientY - y0;
+      if (mode === 0) {
+        if (Math.abs(dx) > 6 && Math.abs(dx) > Math.abs(dy) * 1.1) {
+          mode = 1; moved = true; vp.classList.add("dragging");
+          try { vp.setPointerCapture(pid); } catch (err) { /* ignore */ }
+        } else if (Math.abs(dy) > 8) { mode = -1; }
+      }
+      if (mode !== 1) return;
+      e.preventDefault();
+      let p = startPx + dx;
+      const w = vp.clientWidth;
+      // nothing beyond the plan's first or race week: let it stretch, not slide
+      if ((p > 0 && !weekExists(weekOff - 1)) || (p < 0 && !weekExists(weekOff + 1))) p = p / (1 + Math.abs(p) / (w * 0.35));
+      px = p; place(px, 0);
+      samples.push([e.timeStamp, e.clientX]);
+      while (samples.length > 2 && e.timeStamp - samples[0][0] > 90) samples.shift();
+    });
+    function release(e) {
+      if (e.pointerId !== pid) return;
+      pid = null; vp.classList.remove("dragging");
+      if (mode !== 1) { if (startPx) slide(0, startPx, 0); return; }
+      const a = samples[0], b = samples[samples.length - 1], dt = b[0] - a[0];
+      const v = e.type === "pointercancel" || dt <= 0 ? 0 : (b[1] - a[1]) / dt;   // px per ms
+      const w = vp.clientWidth;
+      let dir = 0;
+      if (Math.abs(v) > 0.3) dir = v < 0 ? 1 : -1;
+      else if (Math.abs(px) > w * 0.22) dir = px < 0 ? 1 : -1;
+      slide(dir, px, v);
+    }
+    vp.addEventListener("pointerup", release);
+    vp.addEventListener("pointercancel", release);
+    // a drag isn't a tap: don't open the day it started on
+    vp.addEventListener("click", e => {
+      if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; return; }
+      const b = e.target.closest(".rh-day");
+      if (b) openDrawer(b.getAttribute("data-iso"));
+    }, true);
+
+    const go = dir => slide(dir, grab(), 0);
+    $("wkPrev").addEventListener("click", () => go(-1));
+    $("wkNext").addEventListener("click", () => go(1));
+    $("weekBack").addEventListener("click", () => {
+      if (!weekOff) return;
+      // a long way back: jump the panes so the slide still arrives from the right side
+      const dir = weekOff > 0 ? -1 : 1;
+      grab(); weekOff = -dir; renderWeek(); slide(dir, 0, 0);
+    });
+    return { go };
+  })();
 
   function renderLatest() {
     const sec = $("latest"), latest = acts.filter(a => actIso(a) >= TP.PLAN_START).slice(0, 4);
@@ -1296,10 +1457,14 @@
   }
 
   // ---------- week review ----------
-  // Completion is only half the story: this also names what was missed and gives
-  // her somewhere to say why, which is the bit that's actually useful later.
+  // Completion is only half the story: this also shows which days slipped, what
+  // the watch actually recorded, and gives her somewhere to say how it felt and
+  // why, which is the bit that's actually useful later.
   const RV_REASONS = ["Too tired", "Illness", "No time", "Work", "Travel", "Weather", "Injury niggle", "Chose to rest"];
+  const RV_FEELS = [["😣", "Rough"], ["😕", "Hard"], ["😐", "OK"], ["🙂", "Good"], ["😄", "Great"]];
+  const X_SVG = '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>';
   let rvMonday = null;   // Monday of the week being reviewed
+  let rvRevealed = null; // the week whose "something got in the way" chips were opened
 
   function weekSessions(monday) {
     const out = [];
@@ -1317,8 +1482,11 @@
   function rvRangeLabel(monday) {
     const a = TP.parse(monday), b = TP.parse(TP.addDays(monday, 6));
     const sameMonth = a.getMonth() === b.getMonth();
-    const lbl = a.getDate() + (sameMonth ? "" : " " + MON_ABBR[a.getMonth()]) + " – " + b.getDate() + " " + MON_ABBR[b.getMonth()];
-    return monday === mondayOf(today) ? "This week · " + lbl : lbl;
+    return a.getDate() + (sameMonth ? "" : " " + MON_ABBR[a.getMonth()]) + " – " + b.getDate() + " " + MON_ABBR[b.getMonth()];
+  }
+  function rvTitle(monday) {
+    const cur = mondayOf(today);
+    return monday === cur ? "This week" : monday === TP.addDays(cur, -7) ? "Last week" : "Week of " + TP.parse(monday).getDate() + " " + MON_ABBR[TP.parse(monday).getMonth()];
   }
 
   function saveReview(patch) {
@@ -1329,65 +1497,117 @@
     if (tag) { tag.textContent = "Saved ✓"; clearTimeout(tag._t); tag._t = setTimeout(() => { tag.textContent = ""; }, 2000); }
   }
 
+  function rvDays(monday, items) {
+    let html = "";
+    for (let i = 0; i < 7; i++) {
+      const d = TP.addDays(monday, i), mine = items.filter(x => x.iso === d), xs = extrasOn(d);
+      const marks = mine.map(x =>
+        '<i class="rv-mark ' + x.status + '" style="--acc:' + col(x.s.type) + '" title="' + esc(shortTitle(x.s.title)) + '">' +
+        (x.status === "done" ? CHECK_SVG : x.status === "missed" ? X_SVG : "") + '</i>').join("");
+      const extras = xs.length ? '<span class="rv-xs">' + xs.slice(0, 3).map(a => '<i style="--acc:' + col(actType(a)) + '"></i>').join("") + '</span>' : "";
+      const st = !mine.length ? "rest" : mine.some(x => x.status === "missed") ? "missed" : mine.every(x => x.status === "done") ? "done" : "todo";
+      const label = DOW_FULL[i] + ": " + (mine.length ? mine.map(x => shortTitle(x.s.title) + " " + (x.status === "upcoming" ? "to come" : x.status)).join(", ") : "rest") +
+        (xs.length ? ", " + xs.length + " extra" : "");
+      html += '<button class="rv-day ' + st + (d === today ? " is-today" : "") + '" data-iso="' + d + '" role="listitem" aria-label="' + esc(label) + '">' +
+        '<span class="rv-dow">' + DOW[i][0] + '</span>' +
+        '<span class="rv-marks">' + (marks || '<i class="rv-mark rest"></i>') + '</span>' + extras + '</button>';
+    }
+    return html;
+  }
+
+  function rvStat(type, label, val) {
+    return '<div class="rv-stat' + (val ? "" : " zero") + '" style="--acc:' + (type ? col(type) : "var(--ink-2)") + '">' +
+      '<span class="rv-stat-l">' + label + '</span><b>' + (val || "–") + '</b></div>';
+  }
+
   let rvNoteTimer = null;
   function renderReview() {
     if (!rvMonday) rvMonday = mondayOf(anchorDay);
     const items = weekSessions(rvMonday);
     const done = items.filter(x => x.status === "done").length;
     const missed = items.filter(x => x.status === "missed");
+    const upcoming = items.filter(x => x.status === "upcoming").length;
     const total = items.length;
-    const pct = total ? Math.round(done / total * 100) : 0;
+    const day = dayOf(rvMonday);
 
-    $("rvRange").textContent = rvRangeLabel(rvMonday);
-    $("rvCount").textContent = done + "/" + total;
-    $("rvPct").textContent = pct + "%";
+    $("rvTitle").textContent = rvTitle(rvMonday);
+    $("rvRange").textContent = rvRangeLabel(rvMonday) + weekTxt(day);
     $("rvNext").disabled = rvMonday >= mondayOf(today);
     $("rvPrev").disabled = rvMonday <= mondayOf(TP.PLAN_START);
 
-    $("rvBar").innerHTML = total
-      ? items.map(x => '<i class="rv-seg ' + x.status + '"></i>').join("")
-      : '<i class="rv-seg upcoming"></i>';
-
-    const vol = sumWeek(rvMonday);
+    // headline: a ring for the count, a verdict that says what it means
     let extraN = 0;
     for (let i = 0; i < 7; i++) extraN += extrasOn(TP.addDays(rvMonday, i)).length;
-    const vp = (type, txt) => '<span class="pill" style="--acc:' + col(type) + '">' + txt + '</span>';
-    $("rvWatch").innerHTML = vol.n
-      ? '<span class="rv-watch-l">⌚ On the watch</span><span class="pills">' +
-        vp("rest", fmtDur(vol.secs)) +
-        (vol.swim ? vp("swim", "Swim " + (vol.swim >= 1000 ? (vol.swim / 1000).toFixed(1) + " km" : Math.round(vol.swim) + " m")) : "") +
-        (vol.bike ? vp("bike", "Bike " + Math.round(vol.bike / 1000) + " km") : "") +
-        (vol.run ? vp("run", "Run " + (vol.run / 1000).toFixed(1) + " km") : "") +
-        (extraN ? vp("mobility", "+" + extraN + " extra") : "") + '</span>'
-      : "";
+    const tone = !total ? "" : missed.length === 0 ? "good" : missed.length <= 2 ? "mid" : "low";
+    let head, sub;
+    if (!total) { head = "Rest week"; sub = "Nothing planned. Enjoy it."; }
+    else if (!missed.length && !upcoming) { head = "Perfect week"; sub = "Every session ticked off" + (extraN ? ", plus " + extraN + " extra." : "."); }
+    else if (!missed.length) { head = "On track"; sub = done + " done, " + upcoming + " to come."; }
+    else {
+      head = missed.length + " missed";
+      sub = upcoming ? done + " done, " + upcoming + " to come. The plan is built to absorb a miss."
+                     : "Missing a session is normal. The plan is built to absorb it.";
+    }
+    $("rvCount").textContent = done + "/" + total;
+    $("rvRing").className = "rv-ring " + tone;
+    $("rvRingFg").style.strokeDasharray = (total ? done / total * 100 : 0) + " 100";
+    $("rvVerdict").textContent = head;
+    $("rvVerdict").className = "rv-verdict " + tone;
+    $("rvVerdictSub").textContent = sub;
 
-    const vd = $("rvVerdict");
-    const settled = missed.length === 0 && items.every(x => x.status !== "upcoming");
-    if (!total) { vd.textContent = "No sessions"; vd.className = "rv-verdict"; }
-    else if (settled) { vd.textContent = "✓ Perfect week"; vd.className = "rv-verdict good"; }
-    else if (missed.length === 0) { vd.textContent = "On track"; vd.className = "rv-verdict good"; }
-    else if (missed.length <= 2) { vd.textContent = missed.length + " missed"; vd.className = "rv-verdict mid"; }
-    else { vd.textContent = missed.length + " missed"; vd.className = "rv-verdict low"; }
+    // the week, day by day: one mark per session, coloured by discipline
+    const days = $("rvDays");
+    days.innerHTML = rvDays(rvMonday, items);
+    days.querySelectorAll(".rv-day").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
 
     const mw = $("rvMissed");
     if (missed.length) {
-      mw.innerHTML = '<div class="rv-missed-title">Missed</div>' +
-        missed.map(x => {
-          const dt = TP.parse(x.iso);
-          return '<button class="rv-miss" data-iso="' + x.iso + '">' +
-            '<i class="rv-miss-dot" style="background:' + col(x.s.type) + '"></i>' +
-            '<span class="rv-miss-day">' + DOW[TP.weekdayMon0(x.iso)] + " " + dt.getDate() + '</span>' +
-            '<span class="rv-miss-name">' + esc(shortTitle(x.s.title)) + '</span>' + CHEV_SVG + '</button>';
-        }).join("") +
-        '<div class="rv-missed-note">Missing a session is normal — the plan is built to absorb it.</div>';
+      mw.innerHTML = missed.map(x => {
+        const dt = TP.parse(x.iso);
+        return '<button class="rv-miss" data-iso="' + x.iso + '">' +
+          '<i class="rv-miss-dot" style="background:' + col(x.s.type) + '"></i>' +
+          '<span class="rv-miss-name">' + esc(shortTitle(x.s.title)) + '</span>' +
+          '<span class="rv-miss-day">' + DOW[TP.weekdayMon0(x.iso)] + " " + dt.getDate() + '</span>' + CHEV_SVG + '</button>';
+      }).join("");
       mw.hidden = false;
       mw.querySelectorAll(".rv-miss").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
     } else { mw.hidden = true; mw.innerHTML = ""; }
 
+    // what the watch recorded — always the same four columns, so weeks compare at a glance
+    const vol = sumWeek(rvMonday);
+    $("rvWatch").innerHTML = vol.n
+      ? '<div class="rv-watch-head"><span>⌚ From the watch</span><span>' + vol.n + (vol.n === 1 ? " workout" : " workouts") +
+          (extraN ? " · " + extraN + " extra" : "") + '</span></div>' +
+        '<div class="rv-stats">' +
+          rvStat(null, "Time", fmtDur(vol.secs).replace(" min", "m")) +
+          rvStat("swim", "Swim", vol.swim ? swimTxt(vol.swim) : "") +
+          rvStat("bike", "Bike", vol.bike ? Math.round(vol.bike / 1000) + " km" : "") +
+          rvStat("run", "Run", vol.run ? (vol.run / 1000).toFixed(1) + " km" : "") +
+        '</div>'
+      : "";
+
+    // reflection: a one-tap feel, then (only if it's relevant) what got in the way
     const saved = state.reviews[rvMonday] || { reasons: [], note: "" };
-    $("rvFbLabel").textContent = missed.length ? "What got in the way?" : "How did the week go?";
+    const feel = $("rvFeel");
+    feel.innerHTML = RV_FEELS.map((f, i) =>
+      '<button class="rv-feel-opt' + (saved.feel === i + 1 ? " on" : "") + '" data-v="' + (i + 1) + '" role="radio" aria-checked="' + (saved.feel === i + 1) + '">' +
+      '<span class="rv-feel-e">' + f[0] + '</span><span class="rv-feel-l">' + f[1] + '</span></button>').join("");
+    feel.querySelectorAll(".rv-feel-opt").forEach(b =>
+      b.addEventListener("click", () => {
+        if (!ensureEdit()) return;
+        const v = Number(b.getAttribute("data-v"));
+        const cur = (state.reviews[rvMonday] || {}).feel;
+        saveReview({ feel: cur === v ? null : v });
+        renderReview();
+      }));
+
+    const reasons = saved.reasons || [];
+    const showReasons = missed.length > 0 || reasons.length > 0 || rvRevealed === rvMonday;
+    $("rvReasons").hidden = !showReasons;
+    $("rvReveal").hidden = showReasons;
+    $("rvReveal").onclick = () => { rvRevealed = rvMonday; renderReview(); };
     $("rvChips").innerHTML = RV_REASONS.map(r =>
-      '<button class="rv-chip' + ((saved.reasons || []).indexOf(r) > -1 ? " on" : "") + '" data-r="' + r + '">' + r + '</button>').join("");
+      '<button class="rv-chip' + (reasons.indexOf(r) > -1 ? " on" : "") + '" data-r="' + r + '" aria-pressed="' + (reasons.indexOf(r) > -1) + '">' + r + '</button>').join("");
     $("rvChips").querySelectorAll(".rv-chip").forEach(b =>
       b.addEventListener("click", () => {
         if (!ensureEdit()) return;
@@ -1397,13 +1617,17 @@
         if (i > -1) cur.splice(i, 1); else cur.push(r);
         saveReview({ reasons: cur });
         b.classList.toggle("on");
+        b.setAttribute("aria-pressed", String(i < 0));
       }));
 
     const ta = $("rvNote");
     if (document.activeElement !== ta) ta.value = saved.note || "";
+    const grow = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+    requestAnimationFrame(grow);
     ta.readOnly = !editing;
     ta.onfocus = () => { if (!editing) { ta.blur(); ensureEdit(); } };
     ta.oninput = () => {
+      grow();
       if (!editing) return;
       clearTimeout(rvNoteTimer);
       rvNoteTimer = setTimeout(() => saveReview({ note: ta.value }), 600);
