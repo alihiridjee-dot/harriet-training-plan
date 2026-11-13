@@ -545,15 +545,361 @@
     return r;
   }
 
+  // a four-point sparkle centred on x,y — used by her avatar and the jigsaw art
+  const star = (x, y, s) => "M" + x + " " + (y - s) + "Q" + x + " " + y + " " + (x + s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y + s) +
+    "Q" + x + " " + y + " " + (x - s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y - s) + "Z";
+
+  // ============================================================
+  // HARRIET, TODAY — her avatar, doing whatever today is
+  // ============================================================
+  // A cartoon Harriet (blonde wavy hair, blue eyes, built like the triathlete she
+  // is) fills the top of the Today tab, and she's actually doing it: running,
+  // riding, swimming, squatting, stretching, or curled up with a brew on a rest
+  // day. What she does follows whatever her Garmin recorded today, or else what
+  // the plan has for her. Tap her and a panel slides up with the numbers.
+  //
+  // She's a jointed figure drawn in SVG: every limb is its own shape, shaded
+  // across its width so it reads as round, and each frame a pose function says
+  // where the joints are (angles in degrees: 0 points down, 90 points the way
+  // she's facing). Far-side limbs are drawn first and darker, for depth.
+  const GY = 236, CX = 195;                       // ground line and centre of the 390 × 270 scene
+  const L1 = 44, L2 = 42, A1 = 29, A2 = 26;       // thigh, shin, upper arm, forearm
+  const D2R = Math.PI / 180;
+  const dirOf = a => [Math.sin(a * D2R), Math.cos(a * D2R)];
+  const along = (p, a, len) => { const d = dirOf(a); return [p[0] + d[0] * len, p[1] + d[1] * len]; };
+  const turn = (v, deg) => { const c = Math.cos(deg * D2R), s = Math.sin(deg * D2R); return [v[0] * c - v[1] * s, v[0] * s + v[1] * c]; };
+  // two-bone reach from a to b: angles for each bone. bend = +1 puts the joint ahead of the line (a knee), -1 behind (an elbow)
+  function ik(a, b, l1, l2, bend) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], d = Math.max(1, Math.min(Math.hypot(dx, dy), l1 + l2 - 0.05));
+    const base = Math.atan2(dx, dy), a1 = Math.acos(Math.max(-1, Math.min(1, (l1 * l1 + d * d - l2 * l2) / (2 * l1 * d))));
+    const th1 = base + bend * a1, k = [a[0] + l1 * Math.sin(th1), a[1] + l1 * Math.cos(th1)];
+    return [th1 / D2R, Math.atan2(b[0] - k[0], b[1] - k[1]) / D2R];
+  }
+
+  const LOOKS = {
+    //          top colour, cut           legs                        feet           hair / headwear        what's in the scene
+    rest:     { top: "#F3ECDD", cut: "hood", legs: "#8E86B8", leg: "long", foot: "sock", hair: "down", k: .96 },
+    run:      { top: "#FF6B5E", cut: "crop", legs: "#23262F", leg: "short", foot: "shoe", hair: "pony", head: "band", k: .86 },
+    bike:     { top: "#2FBF71", cut: "full", legs: "#23262F", leg: "short", foot: "shoe", hair: "pony", head: "helmet", k: 1.0 },
+    swim:     { top: "#FF5A6E", cut: "suit", legs: null, leg: "none", foot: "bare", hair: "cap", head: "cap", k: 1.04 },
+    strength: { top: "#FFC24B", cut: "crop", legs: "#2B2F3A", leg: "long", foot: "shoe", hair: "pony", k: .88 },
+    mobility: { top: "#B8A4F0", cut: "crop", legs: "#5B4DB0", leg: "long", foot: "bare", hair: "down", k: .96 },
+    race:     { top: "#E2475A", cut: "full", legs: "#E2475A", leg: "short", foot: "shoe", hair: "pony", head: "band", bib: true, k: .86 }
+  };
+
+  // --- shapes. A limb runs from its joint at (0,0) down to (0,len); f / b bulge the front and back (muscle)
+  const seg = (len, w1, w2, f, b) => {
+    const r1 = w1 / 2, r2 = w2 / 2, y = (len * .36).toFixed(1);
+    return "M" + (-r1) + " 0A" + r1 + " " + r1 + " 0 0 1 " + r1 + " 0Q" + (r1 + (f || 0)) + " " + y + " " + r2 + " " + len +
+      "A" + r2 + " " + r2 + " 0 0 1 " + (-r2) + " " + len + "Q" + (-r1 - (b || 0)) + " " + y + " " + (-r1) + " 0Z";
+  };
+  // a shape, then the same shape again as a soft light-to-shadow wash so it looks round; far-side limbs get a dusk tint too
+  const vol = (d, fill, far) => '<path d="' + d + '" fill="' + fill + '" stroke="#3A1830" stroke-opacity=".2" stroke-width=".9"/><path d="' + d + '" fill="url(#rgVol)"/>' + (far ? '<path d="' + d + '" fill="#1E1238" opacity=".3"/>' : "");
+  const SKIN = "url(#rgSkin)";
+
+  function rigDefs() {
+    return '<defs>' +
+      '<linearGradient id="rgSkin" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E9B291"/><stop offset=".45" stop-color="#F7D0B3"/><stop offset="1" stop-color="#F3C6A7"/></linearGradient>' +
+      '<radialGradient id="rgFace" cx=".66" cy=".34" r=".85"><stop offset="0" stop-color="#FFE6D3"/><stop offset=".55" stop-color="#F7D0B3"/><stop offset="1" stop-color="#E5AC8A"/></radialGradient>' +
+      '<linearGradient id="rgHair" x1=".8" y1="0" x2=".1" y2="1"><stop offset="0" stop-color="#FFF0BC"/><stop offset=".45" stop-color="#F4D178"/><stop offset="1" stop-color="#D6A640"/></linearGradient>' +
+      '<linearGradient id="rgVol" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#2A0E30" stop-opacity=".36"/><stop offset=".4" stop-color="#2A0E30" stop-opacity="0"/>' +
+        '<stop offset=".72" stop-color="#fff" stop-opacity=".34"/><stop offset="1" stop-color="#2A0E30" stop-opacity=".12"/></linearGradient>' +
+      '<radialGradient id="rgBall" cx=".68" cy=".3" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset=".5" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".22"/></radialGradient>' +
+      '</defs>';
+  }
+
+  function rigLeg(L, far) {
+    const thigh = seg(L1, 21.4, 14.6, 3.8, 2.8), shin = seg(L2, 14.6, 8.6, .6, 4.6);
+    let th = vol(thigh, SKIN, far), sh = vol(shin, SKIN, far), ft;
+    if (L.leg === "short") th += vol(seg(17, 22.4, 20, 1.8, 1.4), L.legs, far);
+    if (L.leg === "long") { th = vol(seg(L1, 22, 15.2, 3.8, 2.8), L.legs, far); sh = vol(seg(L2 - 5, 15.2, 9.4, .6, 4.6), L.legs, far) + '<g transform="translate(0 ' + (L2 - 8) + ')">' + vol(seg(8, 9, 8.2), SKIN, far) + '</g>'; }
+    if (L.foot === "shoe") ft = vol("M-7-5C-8 0-8 4-6 6L15 6C19 6 20 2 16 0C11-2 7-4 5-8L-3-9C-5-9-6-7-7-5Z", "#FFFFFF", far) +
+      '<path d="M-7.4 4L18 4C19.4 6.5 18.4 9 16 9L-5 9C-7.4 9-8.2 6.4-7.4 4Z" fill="#E2475A"/><path d="M2-6l6 7M6-7l6 7" stroke="#E2475A" stroke-width="1.6" stroke-linecap="round"/>' + (far ? '<path d="M-7.4 4L18 4C19.4 6.5 18.4 9 16 9L-5 9C-7.4 9-8.2 6.4-7.4 4Z" fill="#1E1238" opacity=".3"/>' : "");
+    else ft = vol("M-4.5-5C-5.5 1-4.6 6-1.5 6L12 6C15.4 6 15.4 2.6 12 1.6C8 .6 5.4-1.4 4.6-5.4Z", L.foot === "sock" ? "#FFFFFF" : SKIN, far);
+    return [th, sh, ft];
+  }
+  function rigArm(L, far, prop) {
+    const cap = c => '<circle r="8.4" fill="' + c + '"/><circle r="8.4" fill="url(#rgBall)"/>' + (far ? '<circle r="8.4" fill="#1E1238" opacity=".3"/>' : "");
+    let ua = vol(seg(A1, 14.2, 10.6, 2.6, 2), SKIN, far) + cap(SKIN), fa = vol(seg(A2, 10.6, 7.6, 1.4, .8), SKIN, far);
+    if (L.cut === "hood") { ua = vol(seg(A1, 15.6, 12.6, 2, 1.8), L.top, far) + cap(L.top); fa = vol(seg(A2 - 3, 12, 10.4, .8, .6), L.top, far) + '<rect x="-5.4" y="' + (A2 - 6.5) + '" width="10.8" height="4.6" rx="2.3" fill="#DCD2BC"/>'; }
+    if (L.cut === "full" && !L.bib) ua += vol(seg(11, 15.4, 14, 1.6, 1.4), L.top, far) + cap(L.top);
+    const hand = '<circle cx="0" cy="' + (A2 + 2.5) + '" r="5.9" fill="' + SKIN + '"/><circle cx="0" cy="' + (A2 + 2.5) + '" r="5.9" fill="url(#rgBall)"/>' + (far ? '<circle cx="0" cy="' + (A2 + 2.5) + '" r="5.9" fill="#1E1238" opacity=".3"/>' : "");
+    // her watch, on the near wrist
+    const watch = far || L.cut === "hood" ? "" : '<rect x="-4.6" y="' + (A2 - 9) + '" width="9.2" height="5.4" rx="1.6" fill="#15171C"/><circle class="rg-wglow" cx="2.6" cy="' + (A2 - 6.3) + '" r="1.5" fill="#7CF0C0"/>';
+    return [ua, fa + watch + (prop || "") + hand];
+  }
+
+  function rigTorso(L) {
+    const body = "M-8 4C-13.6-2-12.6-12-9.4-20C-7.4-28-11-38-12.6-46C-12.8-55-7-60 1-60C8.6-60 13-56 13.6-49C14.8-42 16-36 13.6-29C11-23 8.2-18 8-12C8-6 10-2 9 4C6 9-4 9-8 4Z";
+    const crop = "M-12.6-46C-12.8-54-8-59-1-60L3.4-60C9.6-59 13-55 13.6-49C14.8-42 16-36 13.6-29C7-25.4-4-26.4-10.6-31C-9.6-36-11.4-41-12.6-46Z";
+    const full = "M-12.6-46C-12.8-54-8-59-1-60L3.4-60C9.6-59 13-55 13.6-49C14.8-42 16-36 13.6-29C11-23 8.2-18 8-12C8-9 8.4-6 9-3.4C4-.6-5-.8-10.6-4.6C-12.4-10-11.4-16-9.4-20C-7.4-28-11-38-12.6-46Z";
+    const hips = "M-11.4-7C-13.4-2-12 2-8 4C-4 9 6 9 9 4C10 0 9.6-4 9-8C3-5.4-5-5-11.4-7Z";
+    let o = '<path d="M-3.6-55L-2.4-68L7.4-68L8.6-54Z" fill="#DDA07E"/>';                                    // neck
+    if (L.cut === "hood") o += '<path d="M-10-50C-19-56-16-68-5-66C1-65 3-60 1-55Z" fill="' + L.top + '"/><path d="M-10-50C-19-56-16-68-5-66C1-65 3-60 1-55Z" fill="#000" opacity=".1"/>';
+    o += vol(body, SKIN);
+    if (L.cut === "crop") o += '<path d="M4.4-26C3.4-20 3.8-14 5-8" fill="none" stroke="#C98A6A" stroke-width="1.4" stroke-linecap="round" opacity=".85"/><path d="M8.6-22L3.8-21M8.2-16.6L4-15.6M8.4-11.4L4.6-10.4" stroke="#C98A6A" stroke-width="1.2" stroke-linecap="round" opacity=".7"/>' +
+      '<path d="M-6-22C-7.4-16-7-11-5.6-7" fill="none" stroke="#C98A6A" stroke-width="1.1" stroke-linecap="round" opacity=".45"/>';
+    if (L.legs) o += vol(hips, L.legs);
+    if (L.cut === "suit") o += vol(body, L.top) + '<path d="M-12.6-46C-12.8-54-8-59-1-60L3.4-60C0-52-5-48-12.6-46Z" fill="' + SKIN + '"/><path d="M-9.6-8C-4-2 4-1 9.4-5" fill="none" stroke="#fff" stroke-width="1.6" opacity=".55"/>';
+    else if (L.cut === "crop") o += vol(crop, L.top) + '<path d="M-10-31C-4-27 6-26.6 12-30" fill="none" stroke="#fff" stroke-width="1.5" opacity=".5"/>';
+    else o += vol(full, L.top);
+    if (L.cut === "hood") o += '<path d="M9-3.4C4-.6-5-.8-10.6-4.6" fill="none" stroke="#DCD2BC" stroke-width="3.4" stroke-linecap="round"/><path d="M9-44L8-30" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".9"/>';
+    if (L.head === "helmet") o += '<path d="M12-49L8-12" stroke="#fff" stroke-width="2.2" opacity=".55"/>';
+    if (L.bib) o += '<rect x="-7" y="-28" width="17" height="13" rx="2.4" fill="#fff"/><text x="1.5" y="-18.4" text-anchor="middle" font-family="ui-rounded,system-ui,sans-serif" font-size="7.4" font-weight="800" fill="#C2263A">70.3</text>';
+    return o;
+  }
+
+  // her head, turned three-quarters toward you; centre at (0,0)
+  function rigHead(L, mood) {
+    const H = "url(#rgHair)", o = [];
+    // hair behind the head
+    if (L.hair === "pony") o.push('<g id="rgPony"><path d="M-17-15C-30-20-43-11-45 2C-46 12-38 16-40 27C-41 34-32 37-29 30C-27 23-31 17-28 9C-26 1-22-2-17-4Z" fill="' + H + '"/>' +
+      '<path d="M-33-9C-39-2-36 7-37 16" fill="none" stroke="#FFF3C8" stroke-width="2.4" stroke-linecap="round" opacity=".8"/><ellipse cx="-19" cy="-9.5" rx="3.4" ry="6" fill="' + L.top + '"/></g>');
+    if (L.hair === "down") o.push('<g id="rgPony"><path d="M-21-8C-29 6-22 17-28 30C-33 43-23 51-28 64C-27 73-13 71-12 61C-9 49-16 42-12 30C-8 20-12 11-7 2Z" fill="' + H + '"/>' +
+      '<path d="M-22 10C-25 20-20 28-23 40M-21 50C-23 57-19 61-20 66" fill="none" stroke="#FFF3C8" stroke-width="2.4" stroke-linecap="round" opacity=".75"/></g>');
+    const back = L.hair === "cap" ? "#FFD43B" : H;
+    o.push('<circle cx="-3" cy="-3" r="23.6" fill="' + back + '"/><circle cx="-3" cy="-3" r="23.6" fill="url(#rgBall)" opacity=".7"/>');
+    // face
+    o.push('<path d="M-6-16C2-22 18-18 20-4C21 4 19 12 14 17C10 21 2 22-4 18C-10 14-12 6-12-2C-12-8-10-13-6-16Z" fill="url(#rgFace)"/>');
+    o.push('<ellipse cx="-10.5" cy="3" rx="4" ry="6" fill="#EDB796"/><path d="M-11.5 0C-9 2-9 5-11 7" fill="none" stroke="#D99C7C" stroke-width="1.2" stroke-linecap="round"/>');
+    o.push('<ellipse cx="-1" cy="9.5" rx="4.6" ry="2.6" fill="#F29C96" opacity=".45"/><ellipse cx="17" cy="9" rx="3" ry="2.2" fill="#F29C96" opacity=".4"/>');
+    o.push('<g fill="none" stroke="#B08A45" stroke-width="2" stroke-linecap="round"><path d="M-3.4-9.6C-.4-12.2 4-12.2 6.8-10.4"/><path d="M11.6-10.6C13.8-12.2 16.6-12 18.6-10"/></g>');
+    const eye = (cx, rx, r) => '<g class="rg-eye"><ellipse cx="' + cx + '" cy="-1" rx="' + rx + '" ry="5.8" fill="#fff"/><circle cx="' + (cx + .8) + '" cy="-.5" r="' + r + '" fill="#4A9DE6"/>' +
+      '<circle cx="' + (cx + .8) + '" cy="-.5" r="' + (r - .6) + '" fill="none" stroke="#2A69A8" stroke-width="1"/><circle cx="' + (cx + .9) + '" cy="-.5" r="' + (r * .46).toFixed(1) + '" fill="#14233A"/>' +
+      '<circle cx="' + (cx + 2.2) + '" cy="-2.4" r="1.3" fill="#fff"/><path d="M' + (cx - rx - .4) + " -3C" + (cx - rx / 2) + " -8 " + (cx + rx / 2) + " -8 " + (cx + rx + .4) + ' -3" fill="none" stroke="#4A3424" stroke-width="2" stroke-linecap="round"/></g>';
+    o.push(eye(2, 5.2, 4.2) + eye(14.4, 4.3, 3.7));
+    o.push('<path d="M11.4 3C13.4 6 12.6 8.6 10 8.4" fill="none" stroke="#D99C7C" stroke-width="1.5" stroke-linecap="round"/>');
+    o.push(mood === "grin"
+      ? '<path d="M1.4 11.4C4 19 13 19 15.6 11.4Z" fill="#8E2F3A"/><path d="M1.4 11.4L15.6 11.4C14 14.4 3 14.4 1.4 11.4Z" fill="#fff"/>'
+      : '<path d="M2.4 12C5 16.4 12 16.4 14.8 12" fill="none" stroke="#B5524E" stroke-width="2" stroke-linecap="round"/>');
+    // hair in front, and whatever she's wearing on her head
+    if (L.hair !== "cap") o.push('<path d="M-13-3C-18-20-7-28 6-27C17-26 23-17 21-6C17-14 10-17 4-15C-3-13-9-9-11-1C-12 1-12.4-1-13-3Z" fill="' + H + '"/>' +
+      '<path d="M-8-20C-1-25 9-25 15-20" fill="none" stroke="#FFF7D6" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>' +
+      '<path d="M-12-2C-15 6-11 11-14 18C-10 18-8 13-8.6 8C-9 4-8 1-9-2Z" fill="' + H + '"/>');
+    if (L.head === "band") o.push('<path d="M-13.6-9C-6-18 12-19 21.4-9.6L21.4-4.6C12-13-5-12-12.6-3.6Z" fill="' + L.top + '"/><path d="M-13.6-9C-6-18 12-19 21.4-9.6" fill="none" stroke="#fff" stroke-width="1.2" opacity=".5"/>');
+    if (L.head === "helmet") o.push('<path d="M-18-5C-24-25-9-34 6-33C21-32 28-21 25-8C17-16 3-18-6-15C-11-13-15-9-18-5Z" fill="#fff"/>' +
+      '<path d="M-18-5C-24-25-9-34 6-33C21-32 28-21 25-8C17-16 3-18-6-15C-11-13-15-9-18-5Z" fill="url(#rgBall)" opacity=".6"/>' +
+      '<g fill="' + L.top + '"><rect x="-8" y="-29" width="5" height="12" rx="2.5" transform="rotate(-20 -5.5 -23)"/><rect x="2" y="-30.6" width="5" height="13" rx="2.5"/><rect x="12" y="-29" width="5" height="12" rx="2.5" transform="rotate(20 14.5 -23)"/></g>' +
+      '<path d="M-18-5C-15-9-11-13-6-15C3-18 17-16 25-8" fill="none" stroke="' + L.top + '" stroke-width="3"/><path d="M-12-7L3 20.6" fill="none" stroke="#23262F" stroke-width="1.3" stroke-linecap="round" opacity=".4"/>');
+    if (L.head === "cap") o.push('<path d="M-14-1C-19-20-7-28 6-27C17-26 23-17 21-6C14-13 4-14-3-11C-8-9-11-5-12 0Z" fill="#FFD43B"/>' +
+      '<path d="M-8-20C-1-25 9-25 15-20" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".6"/>' +
+      '<path d="M-21-3C-14-6-9-6-4-4M8.4-3.4h2" fill="none" stroke="#15171C" stroke-width="2.6" stroke-linecap="round"/>' +
+      '<g fill="#7FD6F2" fill-opacity=".42" stroke="#15171C" stroke-width="1.8"><ellipse cx="2" cy="-1.4" rx="6.6" ry="6"/><ellipse cx="14.6" cy="-1.4" rx="5.4" ry="5.8"/></g>' +
+      '<g fill="#fff" opacity=".7"><ellipse cx="-.6" cy="-4" rx="2" ry="1.1"/><ellipse cx="12.6" cy="-4" rx="1.6" ry="1"/></g>');
+    return o.join("");
+  }
+
+  // --- scenery: what's behind her, between her far and near side, and in front
+  const longRect = (y, h, fill, extra) => '<rect x="-700" y="' + y + '" width="1800" height="' + h + '" fill="' + fill + '"' + (extra || "") + '/>';
+  const dashes = (y, col) => '<path class="sc-dash" d="M-700 ' + y + 'H1100" stroke="' + col + '" stroke-width="3" stroke-dasharray="26 22" stroke-linecap="round"/>';
+  const cloud = (x, y, s, cls) => '<g class="' + cls + '" opacity=".9"><g transform="translate(' + x + " " + y + ") scale(" + s + ')" fill="#fff"><ellipse cx="0" cy="0" rx="30" ry="12"/><ellipse cx="-14" cy="-8" rx="15" ry="11"/><ellipse cx="8" cy="-11" rx="18" ry="13"/></g></g>';
+  function rigScene(act) {
+    const S = { back: "", mid: "", front: "" };
+    if (act === "run" || act === "race") {
+      S.back = '<circle cx="306" cy="150" r="44" fill="#FFE9A6" opacity=".9"/><circle cx="306" cy="150" r="70" fill="#FFE9A6" opacity=".18"/>' + cloud(70, 96, .8, "sc-drift") + cloud(250, 70, .55, "sc-drift slow") +
+        '<path d="M-700 236V196Q-560 150-430 190T-170 184T90 176T330 188T600 178T1100 190V236Z" fill="#000" opacity=".1"/>' +
+        longRect(GY, 200, act === "race" ? "#5A1E2A" : "#5B3044") + longRect(GY, 3, "#fff", ' opacity=".18"') + dashes(GY + 17, "rgba(255,255,255,.55)") +
+        '<g class="sc-whoosh" stroke="#fff" stroke-width="3.4" stroke-linecap="round" opacity=".7"><path d="M52 150h34M30 172h46M58 196h26"/></g>';
+      if (act === "race") {
+        S.back += '<g><rect x="286" y="96" width="7" height="140" fill="#fff"/><rect x="368" y="96" width="7" height="140" fill="#fff"/><rect x="280" y="82" width="101" height="30" rx="6" fill="#15171C"/>' +
+          '<text x="330.5" y="103" text-anchor="middle" font-family="ui-rounded,system-ui,sans-serif" font-size="16" font-weight="800" fill="#fff" letter-spacing="2">FINISH</text></g>';
+        let c = ""; const cols = ["#FFE2A8", "#fff", "#5BB6D3", "#FF9AA2", "#FFD43B"];
+        for (let i = 0; i < 16; i++) c += '<rect class="sc-conf" style="animation-delay:' + (-i * .37).toFixed(2) + 's" x="' + (14 + i * 24) + '" y="-10" width="6" height="9" rx="1.4" fill="' + cols[i % 5] + '" transform="rotate(' + (i * 37 % 90) + " " + (17 + i * 24) + ' -6)"/>';
+        S.front = c;
+      }
+    } else if (act === "bike") {
+      S.back = cloud(84, 92, .9, "sc-drift") + cloud(300, 64, .6, "sc-drift slow") +
+        '<path d="M-700 236V186Q-520 132-360 182T-60 170T220 160T470 178T760 164T1100 180V236Z" fill="#2E9E63" opacity=".55"/>' +
+        '<path d="M-700 236V206Q-540 176-400 204T-120 198T160 192T420 206T700 196T1100 206V236Z" fill="#1F7D4B"/>' +
+        longRect(GY, 200, "#39424F") + longRect(GY, 3, "#fff", ' opacity=".2"') + dashes(GY + 17, "rgba(255,255,255,.6)") +
+        '<g class="sc-whoosh" stroke="#fff" stroke-width="3.4" stroke-linecap="round" opacity=".7"><path d="M22 150h34M2 174h46M26 198h26"/></g>';
+    } else if (act === "swim") {
+      S.back = cloud(90, 70, .7, "sc-drift") + '<circle cx="320" cy="64" r="26" fill="#FFF3B8" opacity=".9"/>' +
+        longRect(184, 300, "#1795BD") + '<g class="sc-wave" fill="none" stroke="#BDEFFB" stroke-width="2.6" stroke-linecap="round" opacity=".7"><path d="M-80 198q14-8 28 0t28 0t28 0M250 204q14-8 28 0t28 0t28 0M120 190q10-6 20 0t20 0"/></g>' +
+        '<g fill="#FF6B5E"><circle cx="-40" cy="184" r="5"/><circle cx="20" cy="184" r="5"/><circle cx="80" cy="184" r="5"/><circle cx="310" cy="184" r="5"/><circle cx="370" cy="184" r="5"/><circle cx="430" cy="184" r="5"/></g><path d="M-700 184H1100" stroke="#fff" stroke-width="1.6" opacity=".6"/>';
+      S.front = '<path class="sc-wave2" d="M-700 300V207q15-9 30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0t30 0V300Z" fill="#35BDE0" opacity=".5"/>' +
+        longRect(268, 200, "#2AB0D6") +
+        '<g class="sc-splash" fill="#fff"><circle cx="286" cy="196" r="3.4"/><circle cx="296" cy="188" r="2.4"/><circle cx="278" cy="186" r="2"/><circle cx="302" cy="198" r="1.8"/></g>' +
+        '<g class="sc-splash b" fill="#fff"><circle cx="78" cy="198" r="3"/><circle cx="68" cy="190" r="2.2"/><circle cx="88" cy="189" r="1.8"/></g>';
+    } else if (act === "strength") {
+      S.back = '<circle cx="195" cy="150" r="118" fill="#fff" opacity=".1"/>' + longRect(GY, 200, "#3B2466") + longRect(GY, 3, "#fff", ' opacity=".2"') +
+        '<g transform="translate(318 236)"><ellipse cx="0" cy="-9" rx="15" ry="11" fill="#23262F"/><path d="M-8-17C-8-31 8-31 8-17" fill="none" stroke="#23262F" stroke-width="5"/><ellipse cx="-4" cy="-12" rx="4" ry="2.6" fill="#fff" opacity=".25"/></g>' +
+        '<g transform="translate(60 236)"><rect x="-22" y="-12" width="44" height="6" rx="3" fill="#4A4F5C"/><rect x="-27" y="-21" width="9" height="24" rx="3" fill="#23262F"/><rect x="18" y="-21" width="9" height="24" rx="3" fill="#23262F"/></g>' +
+        '<g fill="#fff"><path d="' + star(304, 84, 8) + '" opacity=".9"/><path d="' + star(84, 110, 5) + '" opacity=".7"/><path d="' + star(330, 130, 4) + '" opacity=".6"/></g>';
+    } else if (act === "mobility") {
+      S.back = '<circle cx="300" cy="120" r="54" fill="#FFF3D6" opacity=".55"/>' + cloud(86, 84, .7, "sc-drift slow") + longRect(GY, 200, "#4A3E8E") + longRect(GY, 3, "#fff", ' opacity=".2"') +
+        '<rect x="86" y="236" width="230" height="9" rx="4.5" fill="#FF9EC4"/><rect x="86" y="236" width="230" height="3" rx="1.5" fill="#fff" opacity=".35"/>' +
+        '<g transform="translate(346 236)"><rect x="-9" y="-18" width="18" height="18" rx="4" fill="#E8A87C"/><path d="M0-18C-12-34-14-46-4-52C-2-40 0-30 0-18ZM0-18C12-30 18-40 14-50C6-42 2-30 0-18ZM0-18C-2-34 2-48 8-58C12-44 8-30 0-18Z" fill="#3FBF7F"/></g>';
+    } else {   // rest
+      S.back = '<path d="M307.1 46.2A22 22 0 1 0 330.4 76.2A19 19 0 0 1 307.1 46.2Z" fill="#FFE9A8"/><g fill="#fff"><path d="' + star(70, 70, 7) + '"/><path d="' + star(140, 40, 4) + '" opacity=".8"/><path d="' + star(236, 96, 4.5) + '" opacity=".8"/><path d="' + star(356, 132, 3.5) + '" opacity=".7"/><circle cx="34" cy="120" r="1.6"/><circle cx="200" cy="60" r="1.4"/></g>' +
+        longRect(GY, 200, "#2A2360") + longRect(GY, 3, "#fff", ' opacity=".14"') + '<ellipse cx="195" cy="246" rx="150" ry="12" fill="#FF9EC4" opacity=".28"/>' +
+        '<g><ellipse cx="150" cy="212" rx="64" ry="30" fill="#7C6BD0"/><ellipse cx="118" cy="182" rx="34" ry="40" fill="#7C6BD0"/><ellipse cx="150" cy="212" rx="64" ry="30" fill="url(#rgBall)" opacity=".5"/><ellipse cx="118" cy="182" rx="34" ry="40" fill="url(#rgBall)" opacity=".45"/></g>' +
+        '<g class="sc-zz" fill="#fff" font-family="ui-rounded,system-ui,sans-serif" font-weight="800"><text x="222" y="92" font-size="17" opacity=".85">z</text><text x="238" y="74" font-size="12" opacity=".6">z</text></g>';
+    }
+    return S;
+  }
+  // the bike she rides, drawn around its bottom bracket at (0,0)
+  function rigBike(front) {
+    const wheel = x => '<g transform="translate(' + x + ' -7)"><g class="sc-wheel"><circle r="31" fill="none" stroke="#15171C" stroke-width="4.6"/><circle r="27" fill="none" stroke="#C9CFD8" stroke-width="1.6"/>' +
+      '<path d="M0-27V27M-27 0H27M-19-19L19 19M-19 19L19-19" stroke="#C9CFD8" stroke-width="1.1"/></g><circle r="3.4" fill="#4A4F5C"/></g>';
+    if (front) return '<g id="rgCrankN"><path d="M0 0V-15" stroke="#C9CFD8" stroke-width="3.6" stroke-linecap="round"/></g><circle r="8" fill="#23262F"/><circle r="8" fill="none" stroke="#C9CFD8" stroke-width="1.6"/><circle r="2.6" fill="#C9CFD8"/>';
+    return '<g id="rgCrankF"><path d="M0 0V-15" stroke="#8C93A0" stroke-width="3.6" stroke-linecap="round"/></g>' + wheel(-41) + wheel(60) +
+      '<g fill="none" stroke="#E2475A" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M0 0L-13-52L40-52L44-38L0 0M-13-52L-41-7L0 0M44-38L60-7"/></g>' +
+      '<path d="M-13-52L-15-61" stroke="#23262F" stroke-width="4" stroke-linecap="round"/><path d="M-25-62C-20-66-10-66-5-62C-10-60-20-60-25-62Z" fill="#15171C"/>' +
+      '<path d="M40-52L46-62" stroke="#23262F" stroke-width="4" stroke-linecap="round"/><path d="M45-62C52-63 59-61 59-55C59-51 56-49 53-50" fill="none" stroke="#15171C" stroke-width="4" stroke-linecap="round"/>';
+  }
+
+  function rigSvg(act, mood) {
+    const L = LOOKS[act] || LOOKS.rest, S = rigScene(act);
+    const legN = rigLeg(L, false), legF = rigLeg(L, true);
+    const mug = '<g id="rgProp"><path d="M9-4q8 0 8 6.5t-8 6.5" fill="none" stroke="#fff" stroke-width="3.2"/><rect x="-9" y="-10" width="19" height="21" rx="4" fill="#fff"/><rect x="-9" y="-4" width="19" height="4.6" fill="#E2475A"/>' +
+      '<g class="sc-steam" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" opacity=".7"><path d="M-3-14q-3-4.5 0-8.5t0-8.5"/><path d="M5-13q-3-4.5 0-8.5t0-8.5"/></g></g>';
+    const bell = '<g id="rgProp"><rect x="-3" y="-13" width="6" height="26" rx="2" fill="#4A4F5C"/><rect x="-10" y="-21" width="20" height="10" rx="3.4" fill="#23262F"/><rect x="-10" y="11" width="20" height="10" rx="3.4" fill="#23262F"/><rect x="-7" y="-19" width="6" height="2.4" rx="1.2" fill="#fff" opacity=".3"/></g>';
+    const armN = rigArm(L, false, act === "rest" ? '<g transform="translate(0 ' + (A2 + 3) + ')">' + mug + '</g>' : act === "strength" ? '<g transform="translate(0 ' + (A2 + 3) + ')">' + bell + '</g>' : ""), armF = rigArm(L, true);
+    const g = (id, inner) => '<g id="' + id + '">' + inner + '</g>';
+    return '<svg class="rig" viewBox="0 24 390 246" preserveAspectRatio="xMidYMax meet">' + rigDefs() +
+      '<g class="sc-back">' + S.back + '</g>' +
+      '<ellipse id="rgShadow" cx="' + CX + '" cy="' + (GY + 3) + '" rx="54" ry="7" fill="#000" opacity=".22"/>' +
+      '<g transform="translate(' + CX + " " + GY + ") scale(" + L.k + ") translate(" + (-CX) + " " + (-GY) + ')">' +
+        g("rgUaF", armF[0]) + g("rgFaF", armF[1]) + g("rgThF", legF[0]) + g("rgShF", legF[1]) + g("rgFtF", legF[2]) +
+        (act === "bike" ? g("rgBikeB", rigBike(false)) : "") +
+        g("rgTorso", rigTorso(L)) + g("rgHead", rigHead(L, mood)) +
+        g("rgThN", legN[0]) + g("rgShN", legN[1]) + g("rgFtN", legN[2]) +
+        (act === "bike" ? g("rgBikeF", rigBike(true)) : "") +
+        g("rgUaN", armN[0]) + g("rgFaN", armN[1]) +
+      '</g><g class="sc-front">' + S.front + '</g></svg>';
+  }
+
+  // --- poses: where her joints are at time t (seconds). Each returns the hip, the torso's lean,
+  // the head's tilt, and an angle for every limb; extras (crank, bike position) ride along.
+  const POSES = {
+    run(t) {
+      const p = t / .74 * 2 * Math.PI, s = Math.sin(p);
+      const knee = q => 12 + 90 * Math.pow(.5 + .5 * Math.cos(q - Math.PI / 4), 1.5);   // tucked as the leg swings through, straight at push-off
+      const thN = 8 + 38 * s, thF = 8 - 38 * s, shN = thN - knee(p), shF = thF - knee(p + Math.PI);
+      return { h: [CX - 6, GY - 93 - 6 * Math.abs(s)], torso: 11, head: 2, thN: thN, shN: shN, ftN: -shN * .8, thF: thF, shF: shF, ftF: -shF * .8,
+        uaN: 4 - 42 * s, faN: 92 - 34 * s, uaF: 4 + 42 * s, faF: 92 + 34 * s, pony: 26 + 16 * Math.sin(2 * p + 1), shadow: 1 - .28 * Math.abs(s) };
+    },
+    bike(t) {
+      const c = t / .95 * 2 * Math.PI, B = [CX - 10, GY - 24], hip = [B[0] - 13, B[1] - 63 + .7 * Math.sin(2 * c)], lean = 50;
+      const ped = a => [B[0] + 15 * Math.sin(a), B[1] - 15 * Math.cos(a)], pN = ped(c), pF = ped(c + Math.PI);
+      const lN = ik(hip, [pN[0] - 4, pN[1] - 9], L1, L2, 1), lF = ik(hip, [pF[0] - 4, pF[1] - 9], L1, L2, 1);
+      const sh = turn([1, -50], lean), S = [hip[0] + sh[0], hip[1] + sh[1]], ar = ik(S, [B[0] + 54, B[1] - 60], A1, A2, -1);
+      return { h: hip, torso: lean, head: 6, headOff: [-6, 4], thN: lN[0], shN: lN[1], ftN: 6 + 12 * Math.sin(c), thF: lF[0], shF: lF[1], ftF: 6 - 12 * Math.sin(c),
+        uaN: ar[0], faN: ar[1], uaF: ar[0] + 4, faF: ar[1] + 3, pony: 44 + 5 * Math.sin(2 * c), B: B, crank: c / D2R, shadow: 1.5 };
+    },
+    swim(t) {
+      const p = t / 1.7 * 2 * Math.PI, WY = 196, fl = 13 * Math.sin(3 * p);
+      const arm = q => { const a = 90 - q / D2R, up = Math.max(0, -Math.cos(a * D2R)); return [a, a - 78 * Math.pow(up, .8) + 12 * (1 - up)]; };
+      const aN = arm(p), aF = arm(p + Math.PI), thN = -92 + fl, thF = -92 - fl, shN = thN - 5 - 9 * Math.sin(3 * p - .9), shF = thF - 5 + 9 * Math.sin(3 * p - .9);
+      return { h: [CX - 40 + 3 * Math.sin(p), WY + 1 + 1.4 * Math.sin(2 * p)], torso: 85 + 3 * Math.sin(p), head: 4, headOff: [-7, -11],
+        thN: thN, shN: shN, ftN: 90 - shN, thF: thF, shF: shF, ftF: 90 - shF, uaN: aN[0], faN: aN[1], uaF: aF[0], faF: aF[1], pony: 0, shadow: 0 };
+    },
+    strength(t) {
+      const s = .5 - .5 * Math.cos(t / 2.6 * 2 * Math.PI), A = [CX + 2, GY - 9];
+      const K = along(A, -(4 + 24 * s) + 180, L2), H = along(K, 6 + 72 * s + 180, L1), lF = ik(H, [A[0] + 10, A[1]], L1, L2, 1), lN = ik(H, A, L1, L2, 1);
+      return { h: H, torso: 8 + 30 * s, head: 3 * s, thN: lN[0], shN: lN[1], ftN: 0, thF: lF[0], shF: lF[1], ftF: 0,
+        uaN: 34 + 12 * s, faN: 122 + 6 * s, uaF: 42 + 12 * s, faF: 116 + 6 * s, pony: 12 + 14 * s, prop: 0, shadow: 1.1 };
+    },
+    mobility(t) {
+      const b = Math.sin(t / 3.6 * 2 * Math.PI), A = [CX + 40, GY - 6], K = [A[0], A[1] - L2], H = along(K, 80 - 3 * b + 180, L1);
+      return { h: H, torso: -8 + 2 * b, head: -8, thN: 80 - 3 * b, shN: 0, ftN: 0, thF: -38 + 2 * b, shF: -78, ftF: 168,
+        uaN: 171 + 4 * b, faN: 177 + 4 * b, uaF: 163 + 4 * b, faF: 171 + 4 * b, pony: 0, shadow: 1.7 };
+    },
+    rest(t) {
+      const b = Math.sin(t / 4.6 * 2 * Math.PI);
+      return { h: [CX - 30, GY - 43], torso: -16 + .8 * b, head: -3 + .7 * b, thN: 98, shN: 8, ftN: 0, thF: 86, shF: 38, ftF: -8,
+        uaN: 28, faN: 110 + 1.5 * b, uaF: -6, faF: 42, pony: 0, prop: 0, shadow: 0 };
+    }
+  };
+  POSES.race = POSES.run;
+
+  const setT = (id, p, rot) => { const n = $(id); if (n) n.setAttribute("transform", "translate(" + p[0].toFixed(1) + " " + p[1].toFixed(1) + ") rotate(" + rot.toFixed(1) + ")"); };
+  function applyPose(P) {
+    const h = P.h, sh = turn([1, -50], P.torso), S = [h[0] + sh[0], h[1] + sh[1]], SF = [S[0] + 2.5, S[1] + .5];
+    const hd = turn([3, -80], P.torso), HD = [h[0] + hd[0] + (P.headOff ? P.headOff[0] : 0), h[1] + hd[1] + (P.headOff ? P.headOff[1] : 0)];
+    const kN = along(h, P.thN, L1), kF = along(h, P.thF, L1), eN = along(S, P.uaN, A1), eF = along(SF, P.uaF, A1);
+    setT("rgThN", h, -P.thN); setT("rgShN", kN, -P.shN); setT("rgFtN", along(kN, P.shN, L2), P.ftN);
+    setT("rgThF", h, -P.thF); setT("rgShF", kF, -P.shF); setT("rgFtF", along(kF, P.shF, L2), P.ftF);
+    setT("rgTorso", h, P.torso); setT("rgHead", HD, P.head);
+    setT("rgUaN", S, -P.uaN); setT("rgFaN", eN, -P.faN); setT("rgUaF", SF, -P.uaF); setT("rgFaF", eF, -P.faF);
+    const pony = $("rgPony"); if (pony) pony.setAttribute("transform", "rotate(" + P.pony.toFixed(1) + " -19 -9)");
+    const prop = $("rgProp"); if (prop && P.prop !== undefined) prop.setAttribute("transform", "rotate(" + (P.faN + P.prop).toFixed(1) + ")");   // keep what she's holding upright
+    const sd = $("rgShadow"); if (sd) { sd.setAttribute("rx", (54 * P.shadow).toFixed(1)); sd.setAttribute("opacity", P.shadow ? .22 : 0); }
+    if (P.B) {
+      setT("rgBikeB", P.B, 0); setT("rgBikeF", P.B, 0);
+      $("rgCrankN").setAttribute("transform", "rotate(" + P.crank.toFixed(1) + ")"); $("rgCrankF").setAttribute("transform", "rotate(" + (P.crank + 180).toFixed(1) + ")");
+    }
+  }
+
+  // one animation loop, only while she's on screen
+  let rigAct = "", rigT0 = 0, rigOn = false;
+  const rigStill = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function rigFrame(now) {
+    if (!rigOn) return;
+    applyPose(POSES[rigAct]((now - rigT0) / 1000));
+    requestAnimationFrame(rigFrame);
+  }
+  function rigRun() {
+    const want = !!rigAct && !$("view-today").hidden && !document.hidden && !rigStill();
+    if (want && !rigOn) { rigOn = true; requestAnimationFrame(rigFrame); }
+    if (!want) rigOn = false;
+  }
+
+  // what today looks like: the plan, what the watch recorded, and what she should be doing
+  function todaySnapshot() {
+    const ss = sessionsOfDay(today), real = ss.filter(s => s.type !== "rest");
+    const rec = acts.filter(a => actIso(a) === today).sort((x, y) => (y.moving_s || 0) - (x.moving_s || 0));
+    const next = ss.filter((s, i) => s.type !== "rest" && !state.done[keyFor(today, i)])[0];
+    const amt = s => String(s.sub || "").split(/\s+·\s+|,\s+/)[0].replace(/^≈\s*/, "");
+    const plan = !ss.length ? "Nothing planned" : !real.length ? "Rest day" : real.some(s => s.type === "race") ? "Race day"
+      : real.map(s => meta(s.type).label + (real.length === 1 && amt(s) ? " · " + amt(s) : "")).join(" + ");
+    const t = a => LOOKS[actType(a)] ? actType(a) : "mobility";
+    const act = ss.some(s => s.type === "race") ? "race" : rec.length ? t(rec[0]) : next ? next.type : real.length ? real[real.length - 1].type : "rest";
+    const complete = !!real.length && allDone(today);
+    return { ss: ss, real: real, rec: rec, plan: plan, next: next, act: LOOKS[act] ? act : "rest", complete: complete, mood: rec.length || complete || act !== "rest" ? "grin" : "smile" };
+  }
+
+  let meKey = "";
+  function renderMe() {
+    const t = todaySnapshot(), scene = $("scene");
+    scene.setAttribute("data-scene", t.act);
+    if (meKey !== t.act + "|" + t.mood) {            // only rebuild her when what she's doing changes
+      meKey = t.act + "|" + t.mood; rigAct = t.act;
+      $("meAvatar").innerHTML = rigSvg(t.act, t.mood);
+      rigT0 = performance.now();
+      applyPose(POSES[t.act](t.act === "run" || t.act === "race" ? .18 : t.act === "swim" ? .5 : t.act === "bike" ? .2 : 0));
+      rigRun();
+    }
+    $("meAvatar").setAttribute("aria-label", "Harriet, " + ({ rest: "resting", run: "running", bike: "cycling", swim: "swimming", strength: "lifting", mobility: "stretching", race: "racing" }[t.act]) + ". Tap for today's numbers.");
+
+    // one line that says where today stands
+    const txt = t.rec.length && !t.real.length && t.ss.length ? "Bonus session on a rest day 💪"
+      : t.complete ? "Today’s done — proud of you"
+      : t.rec.length && t.next ? "Still to come · " + shortTitle(t.next.title)
+      : t.next ? "Up next · " + shortTitle(t.next.title)
+      : t.ss.length ? "Rest day — feet up" : "";
+    $("meTag").hidden = !txt; $("meTag").firstChild.textContent = txt;
+
+    // the numbers, for when she taps herself
+    const row = (k, main, sub) => '<div class="sd-row"><span class="sd-k">' + k + '</span><span class="sd-v"><b>' + esc(main) + '</b>' + (sub ? '<span>' + esc(sub) + '</span>' : '') + '</span></div>';
+    $("meData").innerHTML = '<div class="sd-grab"></div>' + row("The plan", t.plan, t.real.length > 1 ? "" : t.real.length ? shortTitle(t.real[0].title) : "") +
+      (t.rec.length ? t.rec.map((a, i) => row(i ? "" : "On your watch", (ICONS[actType(a)] || "⚡") + " " + actLabel(a), actStats(a).join(" · "))).join("")
+        : row("On your watch", t.complete ? "Ticked off ✓" : "Nothing recorded yet", "")) +
+      '<button class="sd-open" id="sdOpen">Open today' + CHEV_SVG + '</button>';
+    $("sdOpen").addEventListener("click", e => { e.stopPropagation(); openDrawer(today); });
+  }
+
   function renderHero() {
     const day = dayOf(today), dt = TP.parse(today), h = new Date().getHours();
     $("greeting").textContent = (h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening") + ", Harriet";
     $("heroDate").textContent = day.dayName + " " + dt.getDate() + " " + MONTHS[dt.getMonth()];
     $("heroPhase").textContent = day.phase.label + weekTxt(day);
     const race = nextRaceInfo();
-    $("heroCountdown").textContent = race ? TP.daysBetween(today, race.iso) : "🎉";
-    // the ring's arc is how much of the season is behind her
-    requestAnimationFrame(() => { $("heroRing").style.strokeDasharray = seasonPct() + " 100"; });
+    const left = race ? TP.daysBetween(today, race.iso) : -1;
+    $("heroCountdown").parentNode.innerHTML = left > 0 ? '<b id="heroCountdown">' + left + '</b> day' + (left > 1 ? "s" : "") + ' to go'
+      : '<b id="heroCountdown">' + (left === 0 ? "Race day 🏁" : "Season done 🎉") + '</b>';
+    renderMe();
 
     const r = readiness();
     $("hero").setAttribute("data-level", r.level);
@@ -628,6 +974,7 @@
     const doneCount = sessions.filter((s, i) => s.type !== "rest" && state.done[keyFor(today, i)]).length;
     $("todayMeta").textContent = real.length ? doneCount + " of " + real.length + " done" : "";
 
+    $("todayHead").hidden = false;
     if (!sessions.length) {
       wrap.innerHTML = '<article class="tcard card t-rest" style="--acc:var(--c-rest)"><div class="tc-top"><div class="tc-badge">🌙</div>' +
         '<div class="tc-meta"><div class="tc-type">Off plan</div><h3>Nothing scheduled</h3>' +
@@ -635,7 +982,9 @@
       return;
     }
 
-    wrap.innerHTML = sessions.map((s, idx) => {
+    // On a rest day her avatar and watch say it all, so there's no card to show.
+    const restOnly = !sessions.some(s => s.type !== "rest");
+    wrap.innerHTML = (restOnly ? [] : sessions).map((s, idx) => {
       const isRest = s.type === "rest", done = !!state.done[keyFor(today, idx)], strip = stripFor(today, idx);
       const plan = planOf(s, today), prof = plan && !strip ? profile(plan, true) : "";
       const main = isRest || prof ? "" : mainStep(s);
@@ -656,7 +1005,9 @@
 
     wrap.innerHTML += tipsCard(dayOf(today).tips);
     const extra = extrasOn(today);
-    if (extra.length) wrap.innerHTML += '<div class="card list extras"><div class="list-cap">Also on your watch today</div>' + extra.map(a => actRow(a, false)).join("") + '</div>';
+    // a single workout is already on her watch face up top; list them when there are several
+    if (extra.length > 1 || (extra.length && !restOnly)) wrap.innerHTML += '<div class="card list extras"><div class="list-cap">Also on your watch today</div>' + extra.map(a => actRow(a, false)).join("") + '</div>';
+    $("todayHead").hidden = !wrap.innerHTML;
 
     wrap.querySelectorAll(".tc-tick").forEach(b => b.addEventListener("click", () => {
       if (tick(today, Number(b.getAttribute("data-idx")))) {
@@ -1909,11 +2260,13 @@
     $("view-progress").hidden = v !== "progress";
     $("view-blocks").hidden = v !== "blocks";
     $("nbTitle").textContent = TITLES[v];
+    $("app").classList.toggle("on-scene", v === "today");   // the Today tab opens on her scene, so the bar above it goes light-on-dark
     if (v === "blocks") renderBlocks();
     if (v === "today") renderToday();
     if (v === "calendar") { renderPlan(); renderPushStatus(); }
     if (v === "progress") { renderProgress(); renderReview(); }
     window.scrollTo(0, 0);
+    rigRun();
     try { sessionStorage.setItem("htp_tab", v); } catch (e) { /* ignore */ }
   }
   document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
@@ -1922,6 +2275,18 @@
     showView(v);
   }));
 
+  // tap her (or the line under her) and today's numbers slide up; tap again and they go
+  const toggleData = on => {
+    const d = $("meData"), show = on === undefined ? !d.classList.contains("open") : on;
+    d.classList.toggle("open", show); $("scene").classList.toggle("peek", show);
+    $("meAvatar").setAttribute("aria-expanded", show);
+    if (show) { try { localStorage.setItem("htp_tapped", "1"); } catch (e) { /* ignore */ } $("meHint").hidden = true; }
+  };
+  $("meAvatar").addEventListener("click", () => toggleData());
+  $("meTag").addEventListener("click", () => toggleData());
+  $("meData").addEventListener("click", () => toggleData(false));
+  try { $("meHint").hidden = localStorage.getItem("htp_tapped") === "1"; } catch (e) { /* ignore */ }
+  document.addEventListener("visibilitychange", rigRun);
   $("goalCard").addEventListener("click", () => setFocus(!focusRace));
   $("wpBtn").addEventListener("click", () => pushPlan({}));
   $("cssEdit").addEventListener("click", () => {
@@ -2104,8 +2469,6 @@
     return out;
   })();
 
-  const star = (x, y, s) => "M" + x + " " + (y - s) + "Q" + x + " " + y + " " + (x + s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y + s) +
-    "Q" + x + " " + y + " " + (x - s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y - s) + "Z";
   const JZ_DEFS =
     '<linearGradient id="jzSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2867"/><stop offset=".42" stop-color="#A9478C"/><stop offset=".74" stop-color="#FF8A70"/><stop offset="1" stop-color="#FFD08A"/></linearGradient>' +
     '<radialGradient id="jzSun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFF3C9" stop-opacity=".95"/><stop offset=".45" stop-color="#FFC27A" stop-opacity=".45"/><stop offset="1" stop-color="#FF8A70" stop-opacity="0"/></radialGradient>' +

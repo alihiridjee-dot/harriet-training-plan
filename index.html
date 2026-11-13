@@ -17,7 +17,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=47">
+<link rel="stylesheet" href="styles.css?v=49">
 </head>
 <body>
 
@@ -112,27 +112,27 @@
 
       <!-- ===================== TODAY ===================== -->
       <section class="view" id="view-today">
-        <div class="large-title">
-          <div class="lt-kicker" id="heroDate">—</div>
-          <h1 id="greeting">Hi Harriet</h1>
-        </div>
-
-        <!-- one card that answers "how am I today?" — readiness, form, countdown -->
-        <section class="hero card" id="hero" data-level="none">
-          <div class="hero-main">
-            <div class="hero-txt">
+        <!-- Harriet today: she fills the top of the page, doing whatever today is. Tap her for the numbers. -->
+        <section class="scene" id="scene" data-scene="rest">
+          <div class="scene-top">
+            <div class="lt-kicker" id="heroDate">—</div>
+            <h1 id="greeting">Hi Harriet</h1>
+            <div class="scene-pills">
               <span class="hero-kicker" id="heroPhase">—</span>
-              <div class="hero-head" id="heroHead">Hello</div>
-              <p class="hero-note" id="heroNote"></p>
-            </div>
-            <div class="hero-ring" aria-label="Days to race day">
-              <svg viewBox="0 0 84 84" aria-hidden="true">
-                <circle class="hr-track" cx="42" cy="42" r="36"/>
-                <circle class="hr-prog" id="heroRing" cx="42" cy="42" r="36" pathLength="100"/>
-              </svg>
-              <div class="hr-in"><b id="heroCountdown">–</b><span>days to go</span></div>
+              <span class="hero-count"><b id="heroCountdown">–</b> days to go</span>
             </div>
           </div>
+          <button class="scene-av" id="meAvatar" aria-expanded="false"></button>
+          <span class="scene-hint" id="meHint">Tap her 👆</span>
+          <button class="me-tag" id="meTag" hidden><span></span><svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg></button>
+          <div class="scene-data" id="meData"></div>
+        </section>
+
+        <div class="today-body">
+        <!-- how her body's doing: readiness, sleep, HRV, resting HR, form -->
+        <section class="ready card" id="hero" data-level="none">
+          <div class="hero-head" id="heroHead">Hello</div>
+          <p class="hero-note" id="heroNote"></p>
           <div class="hero-metrics" id="heroMetrics"></div>
           <div class="hero-sugg" id="heroSugg" hidden></div>
         </section>
@@ -140,7 +140,7 @@
         <!-- a surprise from Ali: one jigsaw piece cracks open each day she checks in -->
         <section class="gift" id="gift" hidden></section>
 
-        <div class="sec-head">
+        <div class="sec-head" id="todayHead">
           <h2>Today</h2>
           <span class="sec-meta" id="todayMeta"></span>
         </div>
@@ -187,6 +187,7 @@
           <div class="sec-head"><h2>Coming up</h2></div>
           <div class="list card" id="upnextList"></div>
         </section>
+        </div>
       </section>
 
       <!-- ===================== PLAN ===================== -->
@@ -467,6 +468,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="data.js?v=13"></script>
-  <script src="app.js?v=47"></script>
+  <script src="app.js?v=49"></script>
 </body>
 </html>
