@@ -545,15 +545,217 @@
     return r;
   }
 
+  // a four-point sparkle centred on x,y — used by her avatar and the jigsaw art
+  const star = (x, y, s) => "M" + x + " " + (y - s) + "Q" + x + " " + y + " " + (x + s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y + s) +
+    "Q" + x + " " + y + " " + (x - s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y - s) + "Z";
+
+  // ============================================================
+  // HARRIET, TODAY — her avatar and her watch
+  // ============================================================
+  // A little cartoon Harriet (blonde wavy hair, blue eyes) who is always showing
+  // you her watch. What she's wearing, what's in her other hand and the backdrop
+  // follow what she's doing today — whatever her Garmin recorded, or else what
+  // the plan has for her. The big watch beside her is her wrist, zoomed in:
+  // the plan on top, what she actually did underneath (the time of day until
+  // something has been recorded), and a ring for how much of today is ticked.
+  const AV = { skin: "#F7D2B6", shade: "#EBB999", hair: "#F2CF72", hairL: "#FBE6A2", hairD: "#D9AC48", brow: "#B08A45", lash: "#4A3424", dark: "#2B2F38" };
+  const AV_LOOK = {
+    rest:     { top: "#EDE6D8", topD: "#CFC5B2", sleeve: "long",  hair: "down", arm: "hold", prop: "mug" },
+    run:      { top: "#F0795A", topD: "#D85F42", sleeve: null,    hair: "pony", arm: "flex", prop: "fist", head: "band" },
+    bike:     { top: "#6FB36A", topD: "#4F9449", sleeve: "short", hair: "pony", arm: "flex", prop: "bottle", head: "helmet" },
+    swim:     { top: "#3FA3C4", topD: "#2B86A6", sleeve: null,    hair: "cap",  arm: "flex", prop: "wave", head: "cap" },
+    strength: { top: "#E0B25A", topD: "#C4963F", sleeve: null,    hair: "pony", arm: "flex", prop: "dumbbell" },
+    mobility: { top: "#A996D3", topD: "#8A76BD", sleeve: null,    hair: "down", arm: "hold", prop: "mat" },
+    race:     { top: "#E2475A", topD: "#C2263A", sleeve: null,    hair: "pony", arm: "flex", prop: "fist", head: "band", bib: true }
+  };
+  const limb = (a, b, w, c) => '<path d="M' + a[0] + " " + a[1] + "L" + b[0] + " " + b[1] + '" stroke="' + c + '" stroke-width="' + w + '" stroke-linecap="round" fill="none"/>';
+  const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t];
+
+  function avatarSvg(act, mood) {
+    const L = AV_LOOK[act] || AV_LOOK.rest, o = [];
+    // --- backdrop: a soft disc and a few things that say where she is
+    o.push('<circle cx="120" cy="134" r="104" fill="#fff" opacity=".09"/>');
+    const scene = {
+      rest: '<path d="M52 30A19 19 0 1 0 72 62A15 15 0 1 1 52 30Z" fill="#FFE9A8"/><g fill="#fff"><path d="' + star(196, 44, 7) + '"/><path d="' + star(218, 92, 4) + '"/><path d="' + star(26, 96, 4) + '" opacity=".7"/></g>' +
+        '<g class="av-zz" fill="#fff" font-family="ui-rounded,system-ui,sans-serif" font-weight="800"><text x="176" y="78" font-size="15" opacity=".8">z</text><text x="188" y="62" font-size="11" opacity=".6">z</text></g>',
+      run: '<circle cx="196" cy="48" r="17" fill="#FFD27A"/><g stroke="#FFD27A" stroke-width="3" stroke-linecap="round" opacity=".8"><path d="M196 20v-8M221 31l6-6M224 56h8M171 31l-6-6"/></g>',
+      bike: '<g fill="#fff" opacity=".1"><ellipse cx="50" cy="232" rx="90" ry="46"/><ellipse cx="200" cy="236" rx="80" ry="38"/></g><circle cx="200" cy="44" r="14" fill="#FFE9A8" opacity=".9"/>',
+      swim: '<g fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".28"><path d="M10 78q14-10 28 0t28 0"/><path d="M168 60q14-10 28 0t28 0"/><path d="M176 112q12-8 24 0t24 0"/></g>' +
+        '<g fill="#fff" opacity=".5"><circle cx="206" cy="36" r="4"/><circle cx="218" cy="24" r="2.5"/><circle cx="28" cy="52" r="3"/></g>',
+      strength: '<g fill="#fff"><path d="' + star(198, 46, 8) + '" opacity=".9"/><path d="' + star(216, 76, 4) + '" opacity=".7"/><path d="' + star(180, 28, 3.5) + '" opacity=".6"/></g>',
+      mobility: '<g fill="none" stroke="#fff" opacity=".2" stroke-width="2"><circle cx="196" cy="52" r="12"/><circle cx="196" cy="52" r="22"/><circle cx="196" cy="52" r="32"/></g>',
+      race: '<g><rect x="186" y="30" width="6" height="6" fill="#FFE2A8" transform="rotate(20 189 33)"/><rect x="208" y="54" width="6" height="6" fill="#fff" transform="rotate(-25 211 57)"/><rect x="24" y="44" width="6" height="6" fill="#5BB6D3" transform="rotate(30 27 47)"/>' +
+        '<rect x="204" y="18" width="5" height="5" fill="#FF9AA2" transform="rotate(50 206 20)"/><rect x="40" y="82" width="5" height="5" fill="#FFE2A8" transform="rotate(-15 42 84)"/></g>'
+    }[act] || "";
+    o.push(scene);
+
+    o.push('<defs><linearGradient id="avFade" x1="0" y1="0" x2="0" y2="1"><stop offset=".84" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient>' +
+      '<mask id="avMask" maskUnits="userSpaceOnUse" x="-20" y="-20" width="280" height="280"><rect x="-20" y="-20" width="280" height="262" fill="url(#avFade)"/></mask></defs>');
+    o.push('<g mask="url(#avMask)"><g class="av-body">');
+    const HEAD = ' transform="translate(120 130) scale(1.12) translate(-120 -130)"';   // a slightly bigger head reads friendlier
+    // --- hair behind everything: a long wavy fall, or a ponytail
+    if (L.hair === "down") o.push('<path' + HEAD + ' d="M72 78C58 96 66 118 58 138C50 156 62 170 54 190C50 204 60 214 72 212C80 216 92 212 96 204L144 204C148 212 160 216 168 212C180 214 190 204 186 190C178 170 190 156 182 138C174 118 182 96 168 78C156 50 84 50 72 78Z" fill="' + AV.hairD + '"/>');
+    if (L.hair === "pony") o.push('<g' + HEAD + '><g class="av-pony"><path d="M92 58C70 46 52 58 55 78C57 92 48 100 53 112C58 122 70 120 70 110C70 100 78 94 77 84C77 74 84 66 92 66Z" fill="' + AV.hair + '"/>' +
+      '<path d="M64 62C58 72 62 84 58 96" fill="none" stroke="' + AV.hairL + '" stroke-width="3" stroke-linecap="round" opacity=".8"/><ellipse cx="90" cy="62" rx="5" ry="7" fill="' + L.top + '"/></g></g>');
+
+    // --- torso
+    const skinTorso = '<path d="M58 182C60 160 84 150 104 147C112 153 128 153 136 147C156 150 180 160 182 182L186 240L54 240Z" fill="';
+    if (L.sleeve) {
+      o.push(skinTorso + L.top + '"/>');
+      if (act === "rest") o.push('<path d="M97 150C104 164 136 164 143 150C152 153 158 158 160 166C142 184 98 184 80 166C82 158 88 153 97 150Z" fill="' + L.topD + '"/>' +
+        '<g stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".9"><path d="M110 172L108 198M130 172L132 198"/></g>');
+      if (act === "bike") o.push('<path d="M120 154V240" stroke="' + L.topD + '" stroke-width="2.4"/><path d="M104 148C112 156 128 156 136 148L140 152C130 162 110 162 100 152Z" fill="' + L.topD + '"/>');
+    } else {
+      o.push(skinTorso + AV.skin + '"/>');
+      o.push('<path d="M88 150L99 148C101 164 109 172 120 172C131 172 139 164 141 148L152 150C156 166 166 178 178 184L182 240L58 240L62 184C74 178 84 166 88 150Z" fill="' + L.top + '"/>');
+      o.push('<path d="M99 148C101 164 109 172 120 172C131 172 139 164 141 148" fill="none" stroke="' + L.topD + '" stroke-width="2.4"/>');
+    }
+    if (L.bib) o.push('<rect x="98" y="194" width="44" height="28" rx="5" fill="#fff"/><text x="120" y="213.5" text-anchor="middle" font-family="ui-rounded,system-ui,sans-serif" font-size="13" font-weight="800" fill="#C2263A">70.3</text>');
+    // neck, with a little shadow under the chin
+    o.push('<path d="M108 118L108 146C114 152 126 152 132 146L132 118Z" fill="' + AV.shade + '"/><path d="M108 130C114 138 126 138 132 130L132 120L108 120Z" fill="#D9A283" opacity=".45"/>');
+    if (L.bib) o.push('<path d="M107 146L120 184L133 146" fill="none" stroke="#FFE2A8" stroke-width="4" stroke-linejoin="round"/><circle cx="120" cy="186" r="9" fill="#FFD27A" stroke="#D9AC48" stroke-width="1.5"/><path d="' + star(120, 186, 5) + '" fill="#fff"/>');
+
+    // --- the other arm, and whatever's in that hand
+    const S2 = [68, 170], sl = c => L.sleeve ? L.top : c;
+    if (L.arm === "flex") {
+      const E = [42, 214], W = [35, 164], H = [34, 146];
+      o.push('<g class="av-flex">' + limb(S2, E, 24, AV.skin));
+      if (L.sleeve === "short") o.push(limb(S2, mix(S2, E, .5), 27, L.top));
+      o.push(limb(E, W, 19, AV.skin));
+      if (L.prop === "dumbbell") o.push('<path d="M9 146H59" stroke="#4A4F5C" stroke-width="5"/><rect x="3" y="129" width="10" height="34" rx="3" fill="' + AV.dark + '"/><rect x="13" y="134" width="5" height="24" rx="2" fill="#4A4F5C"/>' +
+        '<rect x="55" y="129" width="10" height="34" rx="3" fill="' + AV.dark + '"/><rect x="50" y="134" width="5" height="24" rx="2" fill="#4A4F5C"/>');
+      if (L.prop === "bottle") o.push('<rect x="25" y="108" width="18" height="36" rx="6" fill="#fff"/><rect x="29" y="100" width="10" height="10" rx="3" fill="' + L.topD + '"/><rect x="25" y="120" width="18" height="6" fill="' + L.top + '"/>');
+      if (L.prop === "wave") o.push(limb([27, 139], [24, 127], 5, AV.skin) + limb([31.5, 137], [30.5, 123], 5, AV.skin) + limb([37, 137], [38, 123], 5, AV.skin) + limb([41.5, 139], [45, 128], 5, AV.skin) + limb([44, 148], [51, 142], 5, AV.skin));
+      o.push('<circle cx="' + H[0] + '" cy="' + H[1] + '" r="11.5" fill="' + AV.skin + '"/>');
+      if (L.prop !== "wave") o.push('<path d="M26 141H42M27 146.5H41" stroke="' + AV.shade + '" stroke-width="1.4" stroke-linecap="round"/>');
+      if (L.prop === "fist" || L.prop === "wave") o.push('<g fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".55"><path d="M14 128q-6 9 0 18"/><path d="M5 122q-9 15 0 30"/></g>');
+      o.push('</g>');
+    } else {
+      const E = [52, 216], W = [92, 206];
+      o.push(limb(S2, E, 24, sl(AV.skin)) + limb(E, W, 20, sl(AV.skin)));
+      if (L.prop === "mug") o.push('<g class="av-steam" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" opacity=".6"><path d="M104 166q-4-6 0-11t0-11"/><path d="M116 168q-4-6 0-11t0-11"/></g>' +
+        '<path d="M124 181q11 0 11 9t-11 9" fill="none" stroke="#fff" stroke-width="4.5"/><rect x="96" y="173" width="29" height="31" rx="6" fill="#fff"/><rect x="96" y="181" width="29" height="6" fill="#E2475A"/>');
+      if (L.prop === "mat") o.push('<rect x="88" y="146" width="22" height="70" rx="10" fill="#7C6BD0"/><circle cx="99" cy="156" r="8" fill="none" stroke="#C9BEF2" stroke-width="2"/><circle cx="99" cy="156" r="3.5" fill="none" stroke="#C9BEF2" stroke-width="2"/>');
+      o.push('<circle cx="103" cy="202" r="11.5" fill="' + AV.skin + '"/>');
+    }
+
+    // --- head
+    o.push('<g class="av-head"' + HEAD + '>');
+    if (L.hair !== "down") o.push('<ellipse cx="87" cy="93" rx="5.5" ry="8.5" fill="' + AV.shade + '"/><ellipse cx="153" cy="93" rx="5.5" ry="8.5" fill="' + AV.shade + '"/>');
+    o.push('<path d="M88 84C88 56 152 56 152 84C152 104 146 118 134 125C126 130 114 130 106 125C94 118 88 104 88 84Z" fill="' + AV.skin + '"/>');
+    o.push('<ellipse cx="96" cy="108" rx="6.5" ry="3.8" fill="#F29C96" opacity=".42"/><ellipse cx="144" cy="108" rx="6.5" ry="3.8" fill="#F29C96" opacity=".42"/>');
+    o.push('<g fill="none" stroke="' + AV.brow + '" stroke-width="2.7" stroke-linecap="round"><path d="M96 81C101 77 108 77 113 80"/><path d="M127 80C132 77 139 77 144 81"/></g>');
+    const eye = (cx, out) => '<g class="av-eye"><ellipse cx="' + cx + '" cy="96" rx="7.6" ry="8" fill="#fff"/><circle cx="' + cx + '" cy="96.6" r="6.3" fill="#4A9DE6"/><circle cx="' + cx + '" cy="96.6" r="5.6" fill="none" stroke="#2A69A8" stroke-width="1.4"/>' +
+      '<circle cx="' + cx + '" cy="96.6" r="3" fill="#14233A"/><circle cx="' + (cx + 2) + '" cy="94" r="1.9" fill="#fff"/><circle cx="' + (cx - 2.2) + '" cy="99" r=".9" fill="#fff" opacity=".8"/>' +
+      '<path d="M' + (cx - 8.6) + " 93C" + (cx - 5) + " 86.6 " + (cx + 5) + " 86.6 " + (cx + 8.6) + ' 93" fill="none" stroke="' + AV.lash + '" stroke-width="2.6" stroke-linecap="round"/>' +
+      '<path d="M' + (cx + out * 8.2) + " 92.2l" + (out * 3.4) + ' -2.6" stroke="' + AV.lash + '" stroke-width="2" stroke-linecap="round"/></g>';
+    o.push(eye(104.5, -1) + eye(135.5, 1));
+    o.push('<path d="M118.5 104C117.5 108 119.5 110.5 122.5 109.5" fill="none" stroke="#D99C7E" stroke-width="1.8" stroke-linecap="round"/>');
+    o.push(mood === "grin"
+      ? '<path d="M106.5 113C111 125 129 125 133.5 113Z" fill="#8E2F3A"/><path d="M106.5 113L133.5 113C131 117.5 109 117.5 106.5 113Z" fill="#fff"/><path d="M113 122C117 119.5 123 119.5 127 122C123 124.5 117 124.5 113 122Z" fill="#E8848A"/>'
+      : '<path d="M108 114C114 121 126 121 132 114" fill="none" stroke="#B5524E" stroke-width="2.7" stroke-linecap="round"/>');
+    // hair in front: the top, the fringe, and (worn down) two wavy locks framing the face
+    if (L.hair !== "cap") {
+      o.push('<path d="M86 90C80 62 96 42 122 42C148 42 162 60 156 92C154 80 148 70 140 64C132 74 110 80 96 72C90 76 87 82 86 90Z" fill="' + AV.hair + '"/>' +
+        '<path d="M100 51C112 45 130 46 142 56" fill="none" stroke="' + AV.hairL + '" stroke-width="3.2" stroke-linecap="round" opacity=".85"/>');
+      if (L.hair === "down") {
+        const lock = 'M88 84C80 100 86 114 80 130C74 146 84 158 78 174C76 186 84 194 92 190C100 186 98 174 96 164C94 150 100 140 96 126C92 112 96 98 92 86Z';
+        const shine = 'M86 104C84 116 88 124 84 136M84 152C82 164 88 170 86 180';
+        o.push('<g class="av-lock"><path d="' + lock + '" fill="' + AV.hair + '"/><path d="' + shine + '" fill="none" stroke="' + AV.hairL + '" stroke-width="2.6" stroke-linecap="round" opacity=".85"/></g>' +
+          '<g class="av-lock r" transform="translate(240 0) scale(-1 1)"><path d="' + lock + '" fill="' + AV.hair + '"/><path d="' + shine + '" fill="none" stroke="' + AV.hairL + '" stroke-width="2.6" stroke-linecap="round" opacity=".85"/></g>');
+      }
+    }
+    if (L.hair !== "down") {
+      const wisp = 'M90 84C84 94 90 102 85 113C90 114 94 107 93 99C92 93 94 89 93 85Z';
+      o.push('<path d="' + wisp + '" fill="' + AV.hair + '"/><path transform="translate(240 0) scale(-1 1)" d="' + wisp + '" fill="' + AV.hair + '"/>');
+    }
+    if (L.head === "band") o.push('<path d="M85 77C96 64 144 64 155 77L155.5 85C144 73 96 73 84.5 85Z" fill="' + L.top + '"/>');
+    if (L.head === "helmet") o.push('<path d="M80 80C76 48 100 31 122 31C146 31 166 48 162 80C150 66 134 60 120 60C106 60 92 66 80 80Z" fill="#fff"/>' +
+      '<g fill="' + L.topD + '"><rect x="101" y="40" width="7" height="17" rx="3.5" transform="rotate(-14 104 48)"/><rect x="117.5" y="37" width="7" height="19" rx="3.5"/><rect x="133" y="40" width="7" height="17" rx="3.5" transform="rotate(14 136 48)"/></g>' +
+      '<path d="M80 80C92 66 106 60 120 60C134 60 150 66 162 80" fill="none" stroke="' + L.top + '" stroke-width="4"/>' +
+      '<g fill="none" stroke="' + AV.dark + '" stroke-width="1.6" opacity=".55"><path d="M89 84L106 126M151 84L134 126"/></g>');
+    if (L.head === "cap") o.push('<path d="M84 90C78 56 98 40 121 40C146 40 162 56 156 90C150 72 136 63 120 63C104 63 90 72 84 90Z" fill="' + L.top + '"/>' +
+      '<path d="M98 50C110 44 132 44 144 52" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".5"/>' +
+      '<path d="M84 74C96 62 144 62 156 74" fill="none" stroke="' + AV.dark + '" stroke-width="3.2"/>' +
+      '<g fill="#17364A" stroke="' + AV.dark + '" stroke-width="2"><ellipse cx="106" cy="68" rx="10" ry="6.5"/><ellipse cx="134" cy="68" rx="10" ry="6.5"/></g>' +
+      '<g fill="#fff" opacity=".55"><ellipse cx="103" cy="66" rx="3" ry="1.6"/><ellipse cx="131" cy="66" rx="3" ry="1.6"/></g>');
+    o.push('</g>');
+
+    // --- the watch arm, raised so you can see it
+    const S = [172, 170], E = [198, 214], W = [205, 164];
+    o.push(limb(S, E, 24, sl(AV.skin)));
+    if (L.sleeve === "short") o.push(limb(S, mix(S, E, .5), 27, L.top));
+    o.push(limb(E, W, 19, AV.skin) + (L.sleeve === "long" ? limb(E, mix(E, W, .58), 21, L.top) : ""));
+    o.push('<circle cx="206" cy="146" r="11.5" fill="' + AV.skin + '"/><path d="M198 141H214M199 146.5H213" stroke="' + AV.shade + '" stroke-width="1.4" stroke-linecap="round"/>');
+    o.push('<path d="M193.6 164.4L216.4 167.6" stroke="#15171C" stroke-width="8.5"/><circle cx="205" cy="166" r="10" fill="#15171C" stroke="#3A3E49" stroke-width="1.6"/>' +
+      '<circle class="av-wglow" cx="205" cy="166" r="6" fill="none" stroke="var(--glow)" stroke-width="2.2"/><circle cx="202.6" cy="163.4" r="1.4" fill="#fff" opacity=".7"/>');
+    o.push('</g></g>');
+    return '<svg viewBox="0 0 240 240" role="img" aria-label="Harriet, ' + ({ rest: "resting", run: "running", bike: "cycling", swim: "swimming", strength: "lifting", mobility: "stretching", race: "racing" }[act] || "today") + '">' + o.join("") + '</svg>';
+  }
+
+  // what today looks like: the plan, what the watch recorded, and how to dress her
+  function todaySnapshot() {
+    const ss = sessionsOfDay(today), real = ss.filter(s => s.type !== "rest");
+    const required = ss.filter((s, i) => counts(today, s, i));
+    const done = ss.filter((s, i) => s.type !== "rest" && state.done[keyFor(today, i)]).length;
+    const rec = acts.filter(a => actIso(a) === today).sort((x, y) => (y.moving_s || 0) - (x.moving_s || 0));
+    const next = ss.filter((s, i) => s.type !== "rest" && !state.done[keyFor(today, i)])[0];
+    const amt = s => String(s.sub || "").split(/\s+·\s+|,\s+/)[0].replace(/^≈\s*/, "");
+    const plan = !ss.length ? "Off plan" : !real.length ? "Rest day" : real.some(s => s.type === "race") ? "Race day"
+      : real.length === 1 ? meta(real[0].type).label + (amt(real[0]) ? " · " + amt(real[0]) : "") : real.map(s => meta(s.type).label).join(" + ");
+    const t = a => AV_LOOK[actType(a)] ? actType(a) : "mobility";
+    const act = ss.some(s => s.type === "race") ? "race" : rec.length ? t(rec[0]) : next ? next.type : real.length ? real[real.length - 1].type : "rest";
+    const complete = !!real.length && allDone(today);
+    return { ss: ss, real: real, rec: rec, plan: plan, next: next, act: AV_LOOK[act] ? act : "rest", complete: complete,
+      mood: rec.length || complete ? "grin" : "smile",
+      ring: required.length ? Math.round(done / required.length * 100) : (ss.length && !real.length ? 100 : done ? 100 : 0) };
+  }
+  const clockNow = () => { const d = new Date(); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+
+  let meKey = "";
+  function renderMe() {
+    const t = todaySnapshot(), hero = $("hero");
+    hero.setAttribute("data-scene", t.act);
+    if (meKey !== t.act + "|" + t.mood) { meKey = t.act + "|" + t.mood; $("meAvatar").innerHTML = avatarSvg(t.act, t.mood); }   // don't restart her animations for nothing
+
+    // the watch face
+    let big, unit = "", line, clock = false;
+    if (t.rec.length) {
+      const secs = sum(t.rec.map(a => a.moving_s || 0)), m = Math.round(secs / 60), a = t.rec[0];
+      if (m < 100) { big = String(m); unit = "min"; } else { big = Math.floor(m / 60) + ":" + String(m % 60).padStart(2, "0"); unit = "h"; }
+      line = t.rec.length > 1 ? t.rec.length + " workouts today" : actLabel(a) + (a.avg_hr ? " · ♥ " + Math.round(a.avg_hr) : "");
+    } else {
+      big = clockNow(); clock = true;
+      line = t.complete ? "✓ Ticked off" : !t.ss.length ? "Nothing planned" : !t.real.length ? "Recharging" : "Not recorded yet";
+    }
+    $("mwPlan").textContent = t.plan;
+    $("mwBig").innerHTML = esc(big) + (unit ? "<small>" + unit + "</small>" : "");
+    $("mwBig").classList.toggle("clock", clock);
+    $("mwRec").textContent = line;
+    $("mwRing").style.strokeDasharray = t.ring + " 100";
+    $("mwRing").style.opacity = t.ring ? 1 : 0;   // a round-capped arc of nothing still draws a dot
+    $("meWatch").setAttribute("aria-label", "Her watch. Plan: " + t.plan + ". " + (t.rec.length ? "Recorded: " + big + " " + unit + ", " + line : line) + ". Tap for today's details.");
+
+    // one line under her that says where today stands
+    const tag = $("meTag");
+    const txt = t.rec.length && !t.real.length && t.ss.length ? "Bonus session on a rest day 💪"
+      : t.complete ? "Today’s done — proud of you"
+      : t.next ? "Up next · " + shortTitle(t.next.title)
+      : t.ss.length ? "Rest day · why rest matters" : "";
+    tag.hidden = !txt;
+    tag.firstChild.textContent = txt;
+  }
+
   function renderHero() {
     const day = dayOf(today), dt = TP.parse(today), h = new Date().getHours();
     $("greeting").textContent = (h < 12 ? "Morning" : h < 18 ? "Afternoon" : "Evening") + ", Harriet";
     $("heroDate").textContent = day.dayName + " " + dt.getDate() + " " + MONTHS[dt.getMonth()];
     $("heroPhase").textContent = day.phase.label + weekTxt(day);
     const race = nextRaceInfo();
-    $("heroCountdown").textContent = race ? TP.daysBetween(today, race.iso) : "🎉";
-    // the ring's arc is how much of the season is behind her
-    requestAnimationFrame(() => { $("heroRing").style.strokeDasharray = seasonPct() + " 100"; });
+    const left = race ? TP.daysBetween(today, race.iso) : -1;
+    $("heroCountdown").parentNode.innerHTML = left > 0 ? '<b id="heroCountdown">' + left + '</b> day' + (left > 1 ? "s" : "") + ' to go'
+      : '<b id="heroCountdown">' + (left === 0 ? "Race day 🏁" : "Season done 🎉") + '</b>';
+    renderMe();
 
     const r = readiness();
     $("hero").setAttribute("data-level", r.level);
@@ -628,6 +830,7 @@
     const doneCount = sessions.filter((s, i) => s.type !== "rest" && state.done[keyFor(today, i)]).length;
     $("todayMeta").textContent = real.length ? doneCount + " of " + real.length + " done" : "";
 
+    $("todayHead").hidden = false;
     if (!sessions.length) {
       wrap.innerHTML = '<article class="tcard card t-rest" style="--acc:var(--c-rest)"><div class="tc-top"><div class="tc-badge">🌙</div>' +
         '<div class="tc-meta"><div class="tc-type">Off plan</div><h3>Nothing scheduled</h3>' +
@@ -635,7 +838,9 @@
       return;
     }
 
-    wrap.innerHTML = sessions.map((s, idx) => {
+    // On a rest day her avatar and watch say it all, so there's no card to show.
+    const restOnly = !sessions.some(s => s.type !== "rest");
+    wrap.innerHTML = (restOnly ? [] : sessions).map((s, idx) => {
       const isRest = s.type === "rest", done = !!state.done[keyFor(today, idx)], strip = stripFor(today, idx);
       const plan = planOf(s, today), prof = plan && !strip ? profile(plan, true) : "";
       const main = isRest || prof ? "" : mainStep(s);
@@ -656,7 +861,9 @@
 
     wrap.innerHTML += tipsCard(dayOf(today).tips);
     const extra = extrasOn(today);
-    if (extra.length) wrap.innerHTML += '<div class="card list extras"><div class="list-cap">Also on your watch today</div>' + extra.map(a => actRow(a, false)).join("") + '</div>';
+    // a single workout is already on her watch face up top; list them when there are several
+    if (extra.length > 1 || (extra.length && !restOnly)) wrap.innerHTML += '<div class="card list extras"><div class="list-cap">Also on your watch today</div>' + extra.map(a => actRow(a, false)).join("") + '</div>';
+    $("todayHead").hidden = !wrap.innerHTML;
 
     wrap.querySelectorAll(".tc-tick").forEach(b => b.addEventListener("click", () => {
       if (tick(today, Number(b.getAttribute("data-idx")))) {
@@ -1698,6 +1905,12 @@
     showView(v);
   }));
 
+  $("meWatch").addEventListener("click", () => openDrawer(today));
+  $("meTag").addEventListener("click", () => openDrawer(today));
+  $("meAvatar").addEventListener("click", () => {   // poke her and she bounces
+    const el = $("meAvatar"); el.classList.remove("boing"); void el.offsetWidth; el.classList.add("boing");
+  });
+  setInterval(() => { const b = $("mwBig"); if (b.classList.contains("clock")) b.textContent = clockNow(); }, 20000);
   $("goalCard").addEventListener("click", () => setFocus(!focusRace));
   $("wpBtn").addEventListener("click", () => pushPlan({}));
   $("cssEdit").addEventListener("click", () => {
@@ -1880,8 +2093,6 @@
     return out;
   })();
 
-  const star = (x, y, s) => "M" + x + " " + (y - s) + "Q" + x + " " + y + " " + (x + s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y + s) +
-    "Q" + x + " " + y + " " + (x - s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y - s) + "Z";
   const JZ_DEFS =
     '<linearGradient id="jzSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2867"/><stop offset=".42" stop-color="#A9478C"/><stop offset=".74" stop-color="#FF8A70"/><stop offset="1" stop-color="#FFD08A"/></linearGradient>' +
     '<radialGradient id="jzSun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFF3C9" stop-opacity=".95"/><stop offset=".45" stop-color="#FFC27A" stop-opacity=".45"/><stop offset="1" stop-color="#FF8A70" stop-opacity="0"/></radialGradient>' +
