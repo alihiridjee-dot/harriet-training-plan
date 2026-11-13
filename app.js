@@ -945,10 +945,14 @@
   }
 
   // ---------- week review ----------
-  // Completion is only half the story: this also names what was missed and gives
-  // her somewhere to say why, which is the bit that's actually useful later.
+  // Completion is only half the story: this also shows which days slipped, what
+  // the watch actually recorded, and gives her somewhere to say how it felt and
+  // why, which is the bit that's actually useful later.
   const RV_REASONS = ["Too tired", "Illness", "No time", "Work", "Travel", "Weather", "Injury niggle", "Chose to rest"];
+  const RV_FEELS = [["😣", "Rough"], ["😕", "Hard"], ["😐", "OK"], ["🙂", "Good"], ["😄", "Great"]];
+  const X_SVG = '<svg viewBox="0 0 24 24"><path d="M7 7l10 10M17 7L7 17"/></svg>';
   let rvMonday = null;   // Monday of the week being reviewed
+  let rvRevealed = null; // the week whose "something got in the way" chips were opened
 
   function weekSessions(monday) {
     const out = [];
@@ -966,8 +970,11 @@
   function rvRangeLabel(monday) {
     const a = TP.parse(monday), b = TP.parse(TP.addDays(monday, 6));
     const sameMonth = a.getMonth() === b.getMonth();
-    const lbl = a.getDate() + (sameMonth ? "" : " " + MON_ABBR[a.getMonth()]) + " – " + b.getDate() + " " + MON_ABBR[b.getMonth()];
-    return monday === mondayOf(today) ? "This week · " + lbl : lbl;
+    return a.getDate() + (sameMonth ? "" : " " + MON_ABBR[a.getMonth()]) + " – " + b.getDate() + " " + MON_ABBR[b.getMonth()];
+  }
+  function rvTitle(monday) {
+    const cur = mondayOf(today);
+    return monday === cur ? "This week" : monday === TP.addDays(cur, -7) ? "Last week" : "Week of " + TP.parse(monday).getDate() + " " + MON_ABBR[TP.parse(monday).getMonth()];
   }
 
   function saveReview(patch) {
@@ -978,65 +985,117 @@
     if (tag) { tag.textContent = "Saved ✓"; clearTimeout(tag._t); tag._t = setTimeout(() => { tag.textContent = ""; }, 2000); }
   }
 
+  function rvDays(monday, items) {
+    let html = "";
+    for (let i = 0; i < 7; i++) {
+      const d = TP.addDays(monday, i), mine = items.filter(x => x.iso === d), xs = extrasOn(d);
+      const marks = mine.map(x =>
+        '<i class="rv-mark ' + x.status + '" style="--acc:' + col(x.s.type) + '" title="' + esc(shortTitle(x.s.title)) + '">' +
+        (x.status === "done" ? CHECK_SVG : x.status === "missed" ? X_SVG : "") + '</i>').join("");
+      const extras = xs.length ? '<span class="rv-xs">' + xs.slice(0, 3).map(a => '<i style="--acc:' + col(actType(a)) + '"></i>').join("") + '</span>' : "";
+      const st = !mine.length ? "rest" : mine.some(x => x.status === "missed") ? "missed" : mine.every(x => x.status === "done") ? "done" : "todo";
+      const label = DOW_FULL[i] + ": " + (mine.length ? mine.map(x => shortTitle(x.s.title) + " " + (x.status === "upcoming" ? "to come" : x.status)).join(", ") : "rest") +
+        (xs.length ? ", " + xs.length + " extra" : "");
+      html += '<button class="rv-day ' + st + (d === today ? " is-today" : "") + '" data-iso="' + d + '" role="listitem" aria-label="' + esc(label) + '">' +
+        '<span class="rv-dow">' + DOW[i][0] + '</span>' +
+        '<span class="rv-marks">' + (marks || '<i class="rv-mark rest"></i>') + '</span>' + extras + '</button>';
+    }
+    return html;
+  }
+
+  function rvStat(type, label, val) {
+    return '<div class="rv-stat' + (val ? "" : " zero") + '" style="--acc:' + (type ? col(type) : "var(--ink-2)") + '">' +
+      '<span class="rv-stat-l">' + label + '</span><b>' + (val || "–") + '</b></div>';
+  }
+
   let rvNoteTimer = null;
   function renderReview() {
     if (!rvMonday) rvMonday = mondayOf(anchorDay);
     const items = weekSessions(rvMonday);
     const done = items.filter(x => x.status === "done").length;
     const missed = items.filter(x => x.status === "missed");
+    const upcoming = items.filter(x => x.status === "upcoming").length;
     const total = items.length;
-    const pct = total ? Math.round(done / total * 100) : 0;
+    const day = dayOf(rvMonday);
 
-    $("rvRange").textContent = rvRangeLabel(rvMonday);
-    $("rvCount").textContent = done + "/" + total;
-    $("rvPct").textContent = pct + "%";
+    $("rvTitle").textContent = rvTitle(rvMonday);
+    $("rvRange").textContent = rvRangeLabel(rvMonday) + weekTxt(day);
     $("rvNext").disabled = rvMonday >= mondayOf(today);
     $("rvPrev").disabled = rvMonday <= mondayOf(TP.PLAN_START);
 
-    $("rvBar").innerHTML = total
-      ? items.map(x => '<i class="rv-seg ' + x.status + '"></i>').join("")
-      : '<i class="rv-seg upcoming"></i>';
-
-    const vol = sumWeek(rvMonday);
+    // headline: a ring for the count, a verdict that says what it means
     let extraN = 0;
     for (let i = 0; i < 7; i++) extraN += extrasOn(TP.addDays(rvMonday, i)).length;
-    const vp = (type, txt) => '<span class="pill" style="--acc:' + col(type) + '">' + txt + '</span>';
-    $("rvWatch").innerHTML = vol.n
-      ? '<span class="rv-watch-l">⌚ On the watch</span><span class="pills">' +
-        vp("rest", fmtDur(vol.secs)) +
-        (vol.swim ? vp("swim", "Swim " + (vol.swim >= 1000 ? (vol.swim / 1000).toFixed(1) + " km" : Math.round(vol.swim) + " m")) : "") +
-        (vol.bike ? vp("bike", "Bike " + Math.round(vol.bike / 1000) + " km") : "") +
-        (vol.run ? vp("run", "Run " + (vol.run / 1000).toFixed(1) + " km") : "") +
-        (extraN ? vp("mobility", "+" + extraN + " extra") : "") + '</span>'
-      : "";
+    const tone = !total ? "" : missed.length === 0 ? "good" : missed.length <= 2 ? "mid" : "low";
+    let head, sub;
+    if (!total) { head = "Rest week"; sub = "Nothing planned. Enjoy it."; }
+    else if (!missed.length && !upcoming) { head = "Perfect week"; sub = "Every session ticked off" + (extraN ? ", plus " + extraN + " extra." : "."); }
+    else if (!missed.length) { head = "On track"; sub = done + " done, " + upcoming + " to come."; }
+    else {
+      head = missed.length + " missed";
+      sub = upcoming ? done + " done, " + upcoming + " to come. The plan is built to absorb a miss."
+                     : "Missing a session is normal. The plan is built to absorb it.";
+    }
+    $("rvCount").textContent = done + "/" + total;
+    $("rvRing").className = "rv-ring " + tone;
+    $("rvRingFg").style.strokeDasharray = (total ? done / total * 100 : 0) + " 100";
+    $("rvVerdict").textContent = head;
+    $("rvVerdict").className = "rv-verdict " + tone;
+    $("rvVerdictSub").textContent = sub;
 
-    const vd = $("rvVerdict");
-    const settled = missed.length === 0 && items.every(x => x.status !== "upcoming");
-    if (!total) { vd.textContent = "No sessions"; vd.className = "rv-verdict"; }
-    else if (settled) { vd.textContent = "✓ Perfect week"; vd.className = "rv-verdict good"; }
-    else if (missed.length === 0) { vd.textContent = "On track"; vd.className = "rv-verdict good"; }
-    else if (missed.length <= 2) { vd.textContent = missed.length + " missed"; vd.className = "rv-verdict mid"; }
-    else { vd.textContent = missed.length + " missed"; vd.className = "rv-verdict low"; }
+    // the week, day by day: one mark per session, coloured by discipline
+    const days = $("rvDays");
+    days.innerHTML = rvDays(rvMonday, items);
+    days.querySelectorAll(".rv-day").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
 
     const mw = $("rvMissed");
     if (missed.length) {
-      mw.innerHTML = '<div class="rv-missed-title">Missed</div>' +
-        missed.map(x => {
-          const dt = TP.parse(x.iso);
-          return '<button class="rv-miss" data-iso="' + x.iso + '">' +
-            '<i class="rv-miss-dot" style="background:' + col(x.s.type) + '"></i>' +
-            '<span class="rv-miss-day">' + DOW[TP.weekdayMon0(x.iso)] + " " + dt.getDate() + '</span>' +
-            '<span class="rv-miss-name">' + esc(shortTitle(x.s.title)) + '</span>' + CHEV_SVG + '</button>';
-        }).join("") +
-        '<div class="rv-missed-note">Missing a session is normal — the plan is built to absorb it.</div>';
+      mw.innerHTML = missed.map(x => {
+        const dt = TP.parse(x.iso);
+        return '<button class="rv-miss" data-iso="' + x.iso + '">' +
+          '<i class="rv-miss-dot" style="background:' + col(x.s.type) + '"></i>' +
+          '<span class="rv-miss-name">' + esc(shortTitle(x.s.title)) + '</span>' +
+          '<span class="rv-miss-day">' + DOW[TP.weekdayMon0(x.iso)] + " " + dt.getDate() + '</span>' + CHEV_SVG + '</button>';
+      }).join("");
       mw.hidden = false;
       mw.querySelectorAll(".rv-miss").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
     } else { mw.hidden = true; mw.innerHTML = ""; }
 
+    // what the watch recorded — always the same four columns, so weeks compare at a glance
+    const vol = sumWeek(rvMonday);
+    $("rvWatch").innerHTML = vol.n
+      ? '<div class="rv-watch-head"><span>⌚ From the watch</span><span>' + vol.n + (vol.n === 1 ? " workout" : " workouts") +
+          (extraN ? " · " + extraN + " extra" : "") + '</span></div>' +
+        '<div class="rv-stats">' +
+          rvStat(null, "Time", fmtDur(vol.secs).replace(" min", "m")) +
+          rvStat("swim", "Swim", vol.swim ? swimTxt(vol.swim) : "") +
+          rvStat("bike", "Bike", vol.bike ? Math.round(vol.bike / 1000) + " km" : "") +
+          rvStat("run", "Run", vol.run ? (vol.run / 1000).toFixed(1) + " km" : "") +
+        '</div>'
+      : "";
+
+    // reflection: a one-tap feel, then (only if it's relevant) what got in the way
     const saved = state.reviews[rvMonday] || { reasons: [], note: "" };
-    $("rvFbLabel").textContent = missed.length ? "What got in the way?" : "How did the week go?";
+    const feel = $("rvFeel");
+    feel.innerHTML = RV_FEELS.map((f, i) =>
+      '<button class="rv-feel-opt' + (saved.feel === i + 1 ? " on" : "") + '" data-v="' + (i + 1) + '" role="radio" aria-checked="' + (saved.feel === i + 1) + '">' +
+      '<span class="rv-feel-e">' + f[0] + '</span><span class="rv-feel-l">' + f[1] + '</span></button>').join("");
+    feel.querySelectorAll(".rv-feel-opt").forEach(b =>
+      b.addEventListener("click", () => {
+        if (!ensureEdit()) return;
+        const v = Number(b.getAttribute("data-v"));
+        const cur = (state.reviews[rvMonday] || {}).feel;
+        saveReview({ feel: cur === v ? null : v });
+        renderReview();
+      }));
+
+    const reasons = saved.reasons || [];
+    const showReasons = missed.length > 0 || reasons.length > 0 || rvRevealed === rvMonday;
+    $("rvReasons").hidden = !showReasons;
+    $("rvReveal").hidden = showReasons;
+    $("rvReveal").onclick = () => { rvRevealed = rvMonday; renderReview(); };
     $("rvChips").innerHTML = RV_REASONS.map(r =>
-      '<button class="rv-chip' + ((saved.reasons || []).indexOf(r) > -1 ? " on" : "") + '" data-r="' + r + '">' + r + '</button>').join("");
+      '<button class="rv-chip' + (reasons.indexOf(r) > -1 ? " on" : "") + '" data-r="' + r + '" aria-pressed="' + (reasons.indexOf(r) > -1) + '">' + r + '</button>').join("");
     $("rvChips").querySelectorAll(".rv-chip").forEach(b =>
       b.addEventListener("click", () => {
         if (!ensureEdit()) return;
@@ -1046,13 +1105,17 @@
         if (i > -1) cur.splice(i, 1); else cur.push(r);
         saveReview({ reasons: cur });
         b.classList.toggle("on");
+        b.setAttribute("aria-pressed", String(i < 0));
       }));
 
     const ta = $("rvNote");
     if (document.activeElement !== ta) ta.value = saved.note || "";
+    const grow = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+    requestAnimationFrame(grow);
     ta.readOnly = !editing;
     ta.onfocus = () => { if (!editing) { ta.blur(); ensureEdit(); } };
     ta.oninput = () => {
+      grow();
       if (!editing) return;
       clearTimeout(rvNoteTimer);
       rvNoteTimer = setTimeout(() => saveReview({ note: ta.value }), 600);

@@ -253,26 +253,42 @@
         <div class="sec-head"><h2>Week review</h2></div>
         <section class="review card" id="review">
           <div class="rv-head">
-            <button class="round-btn" id="rvPrev" aria-label="Previous week"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
-            <div class="rv-range" id="rvRange">–</div>
-            <button class="round-btn" id="rvNext" aria-label="Next week"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+            <div class="rv-when">
+              <div class="rv-title" id="rvTitle">This week</div>
+              <div class="rv-range" id="rvRange">–</div>
+            </div>
+            <div class="rv-nav">
+              <button class="round-btn" id="rvPrev" aria-label="Previous week"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+              <button class="round-btn" id="rvNext" aria-label="Next week"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+            </div>
           </div>
-          <div class="rv-top">
-            <div class="rv-count"><b id="rvCount">0/0</b><span id="rvPct">0%</span></div>
-            <div class="rv-verdict" id="rvVerdict">–</div>
+
+          <div class="rv-summary">
+            <div class="rv-ring" id="rvRing" aria-hidden="true">
+              <svg viewBox="0 0 64 64"><circle class="rv-ring-bg" cx="32" cy="32" r="27"/><circle class="rv-ring-fg" id="rvRingFg" cx="32" cy="32" r="27" pathLength="100"/></svg>
+              <div class="rv-ring-in"><b id="rvCount">0/0</b></div>
+            </div>
+            <div class="rv-verdict-wrap">
+              <div class="rv-verdict" id="rvVerdict">–</div>
+              <div class="rv-verdict-sub" id="rvVerdictSub"></div>
+            </div>
           </div>
-          <div class="rv-bar" id="rvBar"></div>
-          <div class="rv-key">
-            <span><i class="rv-dot done"></i>Done</span>
-            <span><i class="rv-dot missed"></i>Missed</span>
-            <span><i class="rv-dot upcoming"></i>To come</span>
-          </div>
-          <div class="rv-watch" id="rvWatch"></div>
+
+          <div class="rv-days" id="rvDays" role="list"></div>
+
           <div class="rv-missed" id="rvMissed" hidden></div>
+
+          <div class="rv-watch" id="rvWatch"></div>
+
           <div class="rv-feedback">
-            <div class="rv-fb-label" id="rvFbLabel">How did the week go?</div>
-            <div class="rv-chips" id="rvChips"></div>
-            <textarea id="rvNote" rows="3" placeholder="How the legs felt, what got in the way, what you'd change…"></textarea>
+            <div class="rv-q">How did it feel?</div>
+            <div class="rv-feel" id="rvFeel" role="radiogroup" aria-label="How the week felt"></div>
+            <div class="rv-reasons" id="rvReasons">
+              <div class="rv-q" id="rvFbLabel">What got in the way?</div>
+              <div class="rv-chips" id="rvChips"></div>
+            </div>
+            <button class="rv-reveal" id="rvReveal" hidden>+ Something got in the way</button>
+            <textarea id="rvNote" rows="2" placeholder="Notes: how the legs felt, what you'd change…"></textarea>
             <div class="saved-tag" id="rvSaved"></div>
           </div>
         </section>
