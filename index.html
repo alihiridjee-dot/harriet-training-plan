@@ -17,7 +17,7 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=46">
+<link rel="stylesheet" href="styles.css?v=47">
 </head>
 <body>
 
@@ -146,13 +146,24 @@
         </div>
         <div class="today-cards" id="todaySessions"></div>
 
-        <div class="sec-head">
-          <h2>This week</h2>
-          <span class="sec-meta" id="rhythmLabel"></span>
+        <div class="sec-head wk-head">
+          <div class="wk-title">
+            <h2 id="weekTitle">This week</h2>
+            <button class="wk-back" id="weekBack" hidden>Today</button>
+          </div>
+          <div class="wk-right">
+            <span class="sec-meta" id="rhythmLabel"></span>
+            <span class="wk-nav">
+              <button class="round-btn" id="wkPrev" aria-label="Previous week"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+              <button class="round-btn" id="wkNext" aria-label="Next week"><svg viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"/></svg></button>
+            </span>
+          </div>
         </div>
+        <!-- swipe left/right for other weeks: three panes (last, this, next), recentred after each swipe -->
         <section class="week card">
-          <div class="rhythm" id="rhythm"></div>
-          <div class="week-vol" id="weekVol"></div>
+          <div class="week-vp" id="weekVp">
+            <div class="week-track" id="weekTrack"></div>
+          </div>
         </section>
 
         <!-- a message from her best friend -->
@@ -440,6 +451,6 @@
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="data.js?v=13"></script>
-  <script src="app.js?v=46"></script>
+  <script src="app.js?v=47"></script>
 </body>
 </html>
