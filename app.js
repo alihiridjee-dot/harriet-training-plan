@@ -1,7 +1,8 @@
 /* ============================================================
    Harriet's Ironman Journey — UI logic
    Cloud sync (Supabase) · PIN-gated editing · iPhone-first UI:
-   tab bar, bottom sheets, iOS-Calendar month view, swipe nav.
+   floating tab bar, bottom sheets, iOS-Calendar month view, swipe nav,
+   and a jigsaw that hides a surprise.
    Built by her best friend, Ali.
    ============================================================ */
 (function () {
@@ -381,7 +382,7 @@
   }
   const fullDate = iso => { const d = TP.parse(iso); return d.getDate() + " " + MON_ABBR[d.getMonth()] + " " + d.getFullYear(); };
   const PLAN_SPAN = "Plan runs " + fullDate(TP.PLAN_START) + " → " + fullDate(TP.RACE_703);
-  // " · Week 3 of 24" in Phil's plan, " · Week 3" in the summer block
+  // " · Week 3 of 23" in Phil's plan, " · Week 3" in the summer block
   function weekTxt(day, short) { return day.weekNum ? (short ? " · Wk " : " · Week ") + day.weekNum + (day.weekOf ? " of " + day.weekOf : "") : ""; }
   function mondayOf(iso) { return TP.addDays(iso, -TP.weekdayMon0(iso)); }
   // drop the "Run — " prefix, unless what's left only makes sense with it ("Bike — easy")
@@ -493,9 +494,15 @@
     if (!ensureEdit(() => tick(iso, idx))) return false;
     const val = !state.done[keyFor(iso, idx)];
     toggleDone(iso, idx, val);
-    if (val && allDone(iso)) toast(iso === today ? "Day complete — proud of you 💪" : "Day complete ✓");
+    if (val && allDone(iso)) { toast(iso === today ? "Day complete — proud of you 💪" : "Day complete ✓"); if (iso === today) confetti(70); }
     rerenderAll();
     return true;
+  }
+
+  // how far through the season she is, 0–100
+  function seasonPct() {
+    const total = TP.daysBetween(TP.PLAN_START, TP.RACE_703);
+    return Math.round(Math.min(1, Math.max(0, TP.daysBetween(TP.PLAN_START, today) / total)) * 100);
   }
 
   // ---------- TODAY view ----------
@@ -545,6 +552,8 @@
     $("heroPhase").textContent = day.phase.label + weekTxt(day);
     const race = nextRaceInfo();
     $("heroCountdown").textContent = race ? TP.daysBetween(today, race.iso) : "🎉";
+    // the ring's arc is how much of the season is behind her
+    requestAnimationFrame(() => { $("heroRing").style.strokeDasharray = seasonPct() + " 100"; });
 
     const r = readiness();
     $("hero").setAttribute("data-level", r.level);
@@ -633,12 +642,15 @@
       return '<article class="tcard card' + (done ? " done" : "") + (isRest ? " t-rest" : "") + '" style="--acc:' + col(s.type) + '">' +
         '<div class="tc-top">' +
           '<div class="tc-badge">' + (ICONS[s.type] || "•") + '</div>' +
-          '<div class="tc-meta"><div class="tc-type">' + meta(s.type).label + '</div><h3>' + esc(s.title) + '</h3>' + pills(s.sub, col(s.type)) + '</div>' +
-          (isRest ? '' : '<button class="check-hit tc-tick" data-idx="' + idx + '" aria-label="' + (done ? "Done — tap to undo" : "Mark as done") + '"><span class="check lg' + (done ? " on" : "") + '">' + CHECK_SVG + '</span></button>') +
+          '<div class="tc-meta"><div class="tc-type">' + meta(s.type).label + (s.optional && !/optional/i.test(s.title) ? " · optional" : "") + '</div><h3>' + esc(s.title) + '</h3>' + pills(s.sub, col(s.type)) + '</div>' +
         '</div>' +
         prof + (main && !strip ? '<p class="tc-main">' + esc(cssify(main)) + '</p>' : '') +
         strip +
-        '<button class="tc-more">' + (isRest ? "Why rest matters" : "Full workout") + CHEV_SVG + '</button>' +
+        '<div class="tc-actions">' +
+          (isRest ? '' : '<button class="tc-done tc-tick' + (done ? " on" : "") + '" data-idx="' + idx + '" aria-pressed="' + done + '" aria-label="' + (done ? "Done — tap to undo" : "Mark as done") + '">' +
+            (done ? CHECK_SVG + "Done" : '<i class="ring"></i>Mark done') + '</button>') +
+          '<button class="tc-more">' + (isRest ? "Why rest matters" : "Full workout") + CHEV_SVG + '</button>' +
+        '</div>' +
       '</article>';
     }).join("");
 
@@ -648,7 +660,7 @@
 
     wrap.querySelectorAll(".tc-tick").forEach(b => b.addEventListener("click", () => {
       if (tick(today, Number(b.getAttribute("data-idx")))) {
-        const nb = wrap.querySelector('.tc-tick[data-idx="' + b.getAttribute("data-idx") + '"] .check');
+        const nb = wrap.querySelector('.tc-tick[data-idx="' + b.getAttribute("data-idx") + '"]');
         if (nb) nb.classList.add("pop");
       }
     }));
@@ -687,7 +699,9 @@
     }
     el.innerHTML = html;
     el.querySelectorAll(".rh-day").forEach(b => b.addEventListener("click", () => openDrawer(b.getAttribute("data-iso"))));
-    $("rhythmLabel").textContent = total ? done + " of " + total + " done" : "";
+    // in the catch-up week everything is a bonus, so there's no "of"
+    $("rhythmLabel").textContent = dayOf(monday).phase.label === "Catch-up week" ? (done ? done + " done · bonus week" : "Bonus week")
+      : total ? done + " of " + total + " done" : "";
 
     // what the watch recorded this week — hidden until there's anything to show
     const wk = sumWeek(monday), vol = $("weekVol");
@@ -714,6 +728,7 @@
     if ($("view-progress").hidden) return;
     $("progKicker").textContent = acts.length ? "Since " + prettyDate(TP.PLAN_START) : "From her watch";
     renderFitness(); renderHours(); renderPredict(); renderRaceReady(); renderCss();
+    $("fitHead").hidden = $("fitness").hidden && $("hours").hidden;
   }
 
   // ---------- fitness / fatigue / form ----------
@@ -1094,7 +1109,7 @@
 
   // ---------- swim pace (CSS) ----------
   // CSS = (400 m time − 200 m time) ÷ 2, per 100 m. Phil's plan has a test in
-  // weeks 1, 8 and 16; when one has a watch swim attached, its laps are checked
+  // weeks 1, 8 and 15; when one has a watch swim attached, its laps are checked
   // for the 400 and the 200, and every CSS target updates from it.
   function cssify(text) {
     if (!state.css || !state.css.s) return text;
@@ -1241,7 +1256,10 @@
       const ss = sessionsOfDay(cursor);
       if (!ss.length) { cursor = TP.addDays(cursor, -1); continue; }
       const ok = ss.every((x, idx) => x.type === "rest" || x.optional || state.done[keyFor(cursor, idx)]);
-      if (ok) { streak++; cursor = TP.addDays(cursor, -1); } else break;
+      const bonusOnly = ss.some(x => x.type !== "rest") && ss.every((x, idx) => x.type === "rest" || (x.optional && !state.done[keyFor(cursor, idx)]));
+      if (!ok) break;
+      if (!bonusOnly) streak++;
+      cursor = TP.addDays(cursor, -1);
     }
     $("stat-total").textContent = totalDone;
     $("stat-week").textContent = wk.done + "/" + wk.total;
@@ -1484,10 +1502,16 @@
         '<div class="block-focus">' + esc(b.focus) + '</div>' +
         '<div class="block-key">' + b.key.map(k => '<span>' + esc(k) + '</span>').join('') + '</div></div>';
     }).join("");
-    const total = TP.daysBetween(TP.PLAN_START, TP.RACE_703);
-    const pct = Math.round(Math.min(1, Math.max(0, TP.daysBetween(TP.PLAN_START, today) / total)) * 100);
-    $("seasonPct").textContent = pct + "% through the season";
-    requestAnimationFrame(() => { $("seasonFill").style.width = pct + "%"; });
+    // the season as a ribbon — each block as wide as it is long, filled up to today
+    const curB = TP.BLOCKS.filter(b => b.id === cur)[0];
+    $("seasonNow").textContent = curB ? "You are here · " + curB.name : "";
+    $("seasonBar").innerHTML = TP.BLOCKS.map(b => {
+      const len = TP.daysBetween(b.start, b.end) + 1;
+      const fill = Math.round(Math.min(1, Math.max(0, (TP.daysBetween(b.start, today) + 1) / len)) * 100);
+      return '<i class="' + (b.id === cur ? "now" : "") + '" style="flex:' + len + '" title="' + esc(b.name) + '"><b data-w="' + fill + '"></b></i>';
+    }).join("");
+    $("seasonPct").textContent = seasonPct() + "% through the season";
+    requestAnimationFrame(() => $("seasonBar").querySelectorAll("b").forEach(x => { x.style.width = x.getAttribute("data-w") + "%"; }));
     $("aliQuote").textContent = "There is no way around the hard work. Embrace it — and know I'm cheering for every single session.";
   }
 
@@ -1650,7 +1674,12 @@
   // ---------- wiring ----------
   const TITLES = { today: "Today", calendar: "Plan", progress: "Progress", blocks: "Journey" };
   function showView(v) {
-    document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.getAttribute("data-view") === v));
+    document.querySelectorAll(".tab").forEach((t, i) => {
+      const on = t.getAttribute("data-view") === v;
+      t.classList.toggle("active", on);
+      t.setAttribute("aria-selected", on);
+      if (on) $("tabbar").style.setProperty("--tab-i", i);
+    });
     $("view-today").hidden = v !== "today";
     $("view-calendar").hidden = v !== "calendar";
     $("view-progress").hidden = v !== "progress";
@@ -1758,6 +1787,300 @@
       '<span><span class="cchip xtra" style="--acc:' + col("run") + '">+Run</span>Extra from her watch</span>';
   })();
 
+  // ---------- confetti ----------
+  // A short burst of paper from a point on screen (default: lower middle).
+  function confetti(n, origin) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const cv = document.createElement("canvas"); cv.className = "confetti"; document.body.appendChild(cv);
+    const dpr = Math.min(devicePixelRatio || 1, 2), cx = cv.getContext("2d");
+    const W = cv.width = innerWidth * dpr, H = cv.height = innerHeight * dpr;
+    const cols = ["#E2475A", "#FFE2A8", "#FFFFFF", "#F08A5A", "#5BB6D3", "#C9A25A"];
+    const ox = (origin ? origin.x : innerWidth / 2) * dpr, oy = (origin ? origin.y : innerHeight * 0.66) * dpr;
+    const ps = [];
+    for (let k = 0; k < n; k++) {
+      const a = -Math.PI / 2 + (Math.random() - 0.5) * 2, v = (6 + Math.random() * 13) * dpr;
+      ps.push({ x: ox, y: oy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, w: (5 + Math.random() * 6) * dpr, h: (3 + Math.random() * 5) * dpr,
+        r: Math.random() * 6.3, vr: (Math.random() - 0.5) * 0.5, c: cols[k % cols.length] });
+    }
+    const t0 = performance.now(); let last = t0;
+    (function frame(now) {
+      const f = Math.min(3, (now - last) / 16.7), age = (now - t0) / 1000; last = now;
+      cx.clearRect(0, 0, W, H);
+      if (age > 2.8) { cv.remove(); return; }
+      cx.globalAlpha = age < 1.8 ? 1 : Math.max(0, 1 - (age - 1.8));
+      ps.forEach(p => {
+        p.vy += 0.36 * dpr * f; p.vx *= Math.pow(0.985, f); p.x += p.vx * f; p.y += p.vy * f; p.r += p.vr * f;
+        cx.save(); cx.translate(p.x, p.y); cx.rotate(p.r); cx.scale(1, Math.cos(p.r * 2.3));
+        cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); cx.restore();
+      });
+      requestAnimationFrame(frame);
+    })(t0);
+  }
+
+  // ============================================================
+  // THE SURPRISE — a jigsaw that hides a gift, one piece a day
+  // ============================================================
+  // Harriet's new shoes arrive on GIFT.reveal. Until then a jigsaw of wrapping
+  // paper covers a picture of them, and the picture underneath is frosted, so a
+  // cracked piece shows colour but gives nothing away. Each new day she opens
+  // the site she can tap to crack one more piece; on the day itself one tap
+  // shatters whatever is left and the picture comes into focus.
+  // Progress lives on the device (not in the cloud copy), so Ali looking at the
+  // site on his phone never cracks her pieces for her.
+  //   ?gift=preview — play the reveal without saving anything
+  //   ?gift=reset   — wrap it back up on this device
+  const GIFT = {
+    reveal: "2026-11-20",          // Friday — the shoes arrive
+    until: "2026-11-30",           // the unwrapped card stays up until then
+    cols: 4, rows: 3,
+    order: [0, 11, 3, 8, 1, 10, 7, 4, 2, 9, 6, 5],   // corners first, the middle last
+    name: "On Cloudboom",
+    clues: ["Something’s on its way to you…", "It comes as a pair.", "It’s lighter than you’d think.",
+      "It was made to go fast.", "It can’t wait for race day.", "It’s very nearly here."]
+  };
+  const GIFT_KEY = "htp_gift", JW = 400, JH = 300, PW = JW / GIFT.cols, PH = JH / GIFT.rows;
+  const giftPreview = /[?&]gift=preview/.test(location.search);
+  if (/[?&]gift=reset/.test(location.search)) { try { localStorage.removeItem(GIFT_KEY); } catch (e) { /* ignore */ } }
+  let giftMem = null, giftBusy = false;
+  function giftLoad() {
+    if (giftMem) return giftMem;
+    let g = {}; try { g = JSON.parse(localStorage.getItem(GIFT_KEY)) || {}; } catch (e) { /* ignore */ }
+    giftMem = { days: Array.isArray(g.days) ? g.days.filter(d => d < GIFT.reveal) : [], opened: !!g.opened && !giftPreview };
+    return giftMem;
+  }
+  function giftSave() { if (giftPreview) return; try { localStorage.setItem(GIFT_KEY, JSON.stringify(giftMem)); } catch (e) { /* private mode */ } }
+  function giftInfo() {
+    const g = giftLoad(), t = giftPreview ? GIFT.reveal : today, total = GIFT.cols * GIFT.rows;
+    const revealDay = t >= GIFT.reveal, cracked = Math.min(g.days.length, total - 3);   // always a few left for the finale
+    return {
+      g: g, t: t, total: total, cracked: cracked, revealDay: revealDay, sleeps: TP.daysBetween(t, GIFT.reveal),
+      canCrack: !revealDay && g.days.indexOf(t) < 0 && cracked < total - 3,
+      canOpen: revealDay && !g.opened,
+      visible: !(g.opened && t > GIFT.until)
+    };
+  }
+
+  // --- jigsaw geometry: every inner edge carries a tab, alternating which way it points
+  function jzTab(x0, y0, x1, y1, nx, ny) {
+    const L = Math.hypot(x1 - x0, y1 - y0);
+    const P = (u, v) => (x0 + (x1 - x0) * u + nx * v * L).toFixed(1) + " " + (y0 + (y1 - y0) * u + ny * v * L).toFixed(1);
+    return "L" + P(.36, 0) + "C" + P(.42, 0) + " " + P(.43, .05) + " " + P(.41, .1) + "C" + P(.36, .19) + " " + P(.41, .27) + " " + P(.5, .27) +
+      "C" + P(.59, .27) + " " + P(.64, .19) + " " + P(.59, .1) + "C" + P(.57, .05) + " " + P(.58, 0) + " " + P(.64, 0) + "L" + P(1, 0);
+  }
+  const JZ_PATHS = (function () {
+    const out = [], dir = (r, c) => (r + c) % 2 ? 1 : -1;
+    for (let r = 0; r < GIFT.rows; r++) for (let c = 0; c < GIFT.cols; c++) {
+      const x = c * PW, y = r * PH, X = x + PW, Y = y + PH;
+      out.push("M" + x + " " + y +
+        (r > 0 ? jzTab(x, y, X, y, 0, dir(r - 1, c)) : "L" + X + " " + y) +
+        (c < GIFT.cols - 1 ? jzTab(X, y, X, Y, -dir(r, c), 0) : "L" + X + " " + Y) +
+        (r < GIFT.rows - 1 ? jzTab(X, Y, x, Y, 0, dir(r, c)) : "L" + x + " " + Y) +
+        (c > 0 ? jzTab(x, Y, x, y, -dir(r, c - 1), 0) : "L" + x + " " + y) + "Z");
+    }
+    return out;
+  })();
+
+  const star = (x, y, s) => "M" + x + " " + (y - s) + "Q" + x + " " + y + " " + (x + s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y + s) +
+    "Q" + x + " " + y + " " + (x - s) + " " + y + "Q" + x + " " + y + " " + x + " " + (y - s) + "Z";
+  const JZ_DEFS =
+    '<linearGradient id="jzSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2B2867"/><stop offset=".42" stop-color="#A9478C"/><stop offset=".74" stop-color="#FF8A70"/><stop offset="1" stop-color="#FFD08A"/></linearGradient>' +
+    '<radialGradient id="jzSun" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFF3C9" stop-opacity=".95"/><stop offset=".45" stop-color="#FFC27A" stop-opacity=".45"/><stop offset="1" stop-color="#FF8A70" stop-opacity="0"/></radialGradient>' +
+    '<linearGradient id="jzUpper" x1="0" y1="0" x2=".3" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#EFE8F6"/></linearGradient>' +
+    '<linearGradient id="jzSole" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E3DCF0"/></linearGradient>' +
+    '<linearGradient id="jzHot" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FF7A6B"/><stop offset="1" stop-color="#D2263F"/></linearGradient>' +
+    '<linearGradient id="jzPaper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#262830"/><stop offset=".55" stop-color="#2C1D24"/><stop offset="1" stop-color="#421A22"/></linearGradient>' +
+    '<linearGradient id="jzRibV" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#A11B28"/><stop offset=".3" stop-color="#F0596A"/><stop offset=".55" stop-color="#D2404C"/><stop offset="1" stop-color="#8E1622"/></linearGradient>' +
+    '<linearGradient id="jzRibH" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#A11B28"/><stop offset=".3" stop-color="#F0596A"/><stop offset=".55" stop-color="#D2404C"/><stop offset="1" stop-color="#8E1622"/></linearGradient>' +
+    '<pattern id="jzSpark" width="50" height="50" patternUnits="userSpaceOnUse" patternTransform="rotate(18)">' +
+      '<path d="' + star(13, 14, 5) + '" fill="#C9A25A" opacity=".55"/><circle cx="38" cy="36" r="1.5" fill="#C9A25A" opacity=".5"/><circle cx="36" cy="9" r="1" fill="#fff" opacity=".28"/></pattern>' +
+    '<filter id="jzBlur" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="15"/><feColorMatrix type="saturate" values="1.35"/></filter>' +
+    '<clipPath id="jzFrame"><rect width="' + JW + '" height="' + JH + '"/></clipPath>' +
+    // the picture: a racing shoe riding a cloud at sunrise
+    '<g id="jzArt">' +
+      '<rect x="-40" y="-40" width="480" height="380" fill="url(#jzSky)"/>' +
+      '<circle cx="205" cy="186" r="170" fill="url(#jzSun)"/>' +
+      '<g fill="#fff"><path d="' + star(58, 46, 9) + '" opacity=".95"/><path d="' + star(342, 58, 7) + '" opacity=".9"/><path d="' + star(300, 26, 4) + '" opacity=".8"/>' +
+        '<path d="' + star(120, 28, 4) + '" opacity=".7"/><circle cx="170" cy="48" r="1.6" opacity=".8"/><circle cx="258" cy="70" r="1.4" opacity=".7"/><circle cx="30" cy="96" r="1.4" opacity=".7"/><circle cx="372" cy="112" r="1.6" opacity=".7"/></g>' +
+      '<g fill="#fff" opacity=".5"><ellipse cx="70" cy="240" rx="78" ry="30"/><ellipse cx="330" cy="232" rx="86" ry="32"/><ellipse cx="200" cy="248" rx="110" ry="30"/></g>' +
+      '<g stroke="#fff" stroke-width="3.5" stroke-linecap="round" opacity=".8"><path d="M6 146h40M-4 168h30M14 190h26"/></g>' +
+      '<ellipse cx="204" cy="236" rx="128" ry="11" fill="#9A6BB8" opacity=".22"/>' +
+      '<g transform="translate(22 58) rotate(-9 170 95) scale(1.12)">' +
+        '<path d="M30 122C19 112 19 96 30 88C90 97 170 105 240 101C268 99 288 97 298 91C297 108 271 125 236 129L64 131C48 131 36 129 30 122Z" fill="url(#jzSole)" stroke="#2A2140" stroke-opacity=".22" stroke-width="1.2"/>' +
+        '<g fill="#7A4A9A" opacity=".5"><ellipse cx="60" cy="109" rx="12" ry="7"/><ellipse cx="92" cy="113" rx="12" ry="6.5"/><ellipse cx="124" cy="115.5" rx="12" ry="6.5"/><ellipse cx="156" cy="117" rx="12" ry="6.5"/><ellipse cx="188" cy="117" rx="12" ry="6.5"/><ellipse cx="220" cy="115.5" rx="12" ry="6"/><ellipse cx="250" cy="112" rx="10" ry="5"/></g>' +
+        '<path d="M36 128C48 132 56 132 64 131L236 129C264 126 286 112 297 95" fill="none" stroke="#2A2140" stroke-width="4.5" stroke-linecap="round"/>' +
+        '<path d="M30 88C25 72 28 54 40 42C46 36 54 36 58 42C64 52 74 58 88 58C100 58 106 46 114 36C118 31 126 30 130 34L198 76C232 82 268 82 298 91C288 97 268 99 240 101C170 105 90 97 30 88Z" fill="url(#jzUpper)" stroke="#2A2140" stroke-opacity=".25" stroke-width="1.2"/>' +
+        '<path d="M30 88C25 72 28 54 40 42C46 36 54 36 58 42C60 46 62 49 65 51C64 68 58 82 50 92C43 91 36 89 30 88Z" fill="url(#jzHot)"/>' +
+        '<path d="M108 97L138 60L152 65L124 99Z" fill="url(#jzHot)"/><path d="M134 100L163 68L175 73L149 101Z" fill="url(#jzHot)" opacity=".8"/>' +
+        '<path d="M58 42C64 52 74 58 88 58C100 58 106 46 114 36" fill="none" stroke="#CFC4E2" stroke-width="3.5" stroke-linecap="round"/>' +
+        '<path d="M198 76C212 84 224 92 234 101" fill="none" stroke="#D9D0E6" stroke-width="1.6"/>' +
+        '<g stroke="#2A2140" stroke-width="3.2" stroke-linecap="round"><path d="M137 39l-9 12M149 46l-9 12M161 54l-9 12M173 61l-9 12M185 69l-9 12"/></g>' +
+        '<path d="M41 41C35 35 38 29 44 31" fill="none" stroke="#D2263F" stroke-width="4" stroke-linecap="round"/>' +
+        '<path d="M250 86C266 87 282 89 293 92" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" opacity=".9"/>' +
+      '</g>' +
+      '<g fill="#FFE2A8"><path d="' + star(40, 118, 8) + '"/><path d="' + star(66, 98, 4.5) + '"/><path d="' + star(24, 128, 3.5) + '"/></g>' +
+      '<g fill="#fff"><ellipse cx="40" cy="282" rx="90" ry="42"/><ellipse cx="150" cy="268" rx="70" ry="34"/><ellipse cx="262" cy="274" rx="82" ry="38"/><ellipse cx="366" cy="284" rx="78" ry="40"/><ellipse cx="205" cy="304" rx="240" ry="34"/></g>' +
+      '<g fill="#E9D9F2" opacity=".7"><ellipse cx="96" cy="296" rx="60" ry="12"/><ellipse cx="300" cy="298" rx="72" ry="12"/></g>' +
+    '</g>' +
+    // the wrapping: dark paper, gold sparkles, a crimson ribbon and bow
+    '<g id="jzCover">' +
+      '<rect width="' + JW + '" height="' + JH + '" fill="url(#jzPaper)"/><rect width="' + JW + '" height="' + JH + '" fill="url(#jzSpark)"/>' +
+      '<rect x="178" width="44" height="' + JH + '" fill="url(#jzRibV)"/><rect y="128" width="' + JW + '" height="44" fill="url(#jzRibH)"/>' +
+      '<g stroke="#FFE2A8" stroke-opacity=".5" stroke-width="1"><path d="M178.5 0v300M221.5 0v300M0 128.5h400M0 171.5h400"/></g>' +
+      '<g stroke="#7A0F1B" stroke-opacity=".55" stroke-width="1.2">' +
+        '<path d="M200 150C176 104 118 100 124 142C128 170 174 166 200 150Z" fill="#E2475A"/><path d="M200 150C224 104 282 100 276 142C272 170 226 166 200 150Z" fill="#D2404C"/>' +
+        '<path d="M200 150C182 124 150 122 152 142C154 156 180 156 200 150Z" fill="#A11B28"/><path d="M200 150C218 124 250 122 248 142C246 156 220 156 200 150Z" fill="#8E1622"/>' +
+        '<path d="M194 158L170 206L186 200L192 214L206 162Z" fill="#C2263A"/><path d="M206 158L230 206L214 200L208 214L196 162Z" fill="#A11B28"/>' +
+        '<rect x="186" y="137" width="28" height="27" rx="8" fill="#F0596A"/></g>' +
+    '</g>';
+
+  function giftSvg(info) {
+    const gone = {}; GIFT.order.slice(0, info.g.opened ? info.total : info.cracked).forEach(i => { gone[i] = 1; });
+    const next = info.canCrack ? GIFT.order[info.cracked] : -1;
+    let clips = "", pieces = "";
+    JZ_PATHS.forEach((d, i) => {
+      clips += '<clipPath id="jzc' + i + '"><path d="' + d + '"/></clipPath>';
+      pieces += gone[i] ? (info.g.opened ? "" : '<path class="jz-hole" d="' + d + '"/>')
+        : '<g class="jz-piece' + (i === next ? " jz-next" : "") + (info.canOpen ? " jz-open" : "") + '" data-i="' + i + '">' +
+          '<g clip-path="url(#jzc' + i + ')"><use href="#jzCover"/></g><path class="jz-shine" d="' + d + '"/><path class="jz-edge" d="' + d + '"/></g>';
+    });
+    return '<svg class="jz-svg" viewBox="0 0 ' + JW + ' ' + JH + '" aria-hidden="true"><defs>' + JZ_DEFS + clips + '</defs>' +
+      '<g clip-path="url(#jzFrame)">' +
+        '<g class="jz-frost" filter="url(#jzBlur)"><use href="#jzArt"/></g><rect class="jz-veil" width="' + JW + '" height="' + JH + '"/>' +
+        '<g class="jz-crisp"><use href="#jzArt"/></g>' +
+        '<g class="jz-pieces">' + pieces + '</g><g class="jz-fx"></g>' +
+        '<rect class="jz-flash" width="' + JW + '" height="' + JH + '"/>' +
+      '</g></svg>';
+  }
+
+  // what the card says in each state
+  function giftCopy(info) {
+    if (info.g.opened) return {
+      kicker: "🎁 Your surprise · from Ali", when: "Unwrapped", title: GIFT.name,
+      sub: "Your new race shoes" + (info.t === GIFT.reveal ? " arrive today" : "") + ". Light as a cloud, made to fly — just like you.", sign: "— Ali, your biggest fan"
+    };
+    const when = info.revealDay ? "Today!" : info.sleeps === 1 ? "1 sleep to go" : info.sleeps + " sleeps to go";
+    if (info.canOpen) return { kicker: "🎁 A surprise from Ali", when: when, title: "It’s here!", sub: "Tap to open your surprise." };
+    if (info.canCrack) return { kicker: "🎁 A surprise from Ali", when: when, title: "Today’s piece is ready",
+      sub: "Tap the glowing piece to crack it open." + (info.cracked ? "" : " A new piece every day you check in — all is revealed on Friday.") };
+    return { kicker: "🎁 A surprise from Ali", when: when, title: info.cracked + " of " + info.total + " pieces cracked",
+      sub: info.sleeps === 1 ? "The big reveal is tomorrow." : "Come back tomorrow to crack the next one.",
+      clue: info.cracked ? GIFT.clues[Math.min(info.cracked, GIFT.clues.length) - 1] : "" };
+  }
+
+  function renderGift() {
+    const el = $("gift"), info = giftInfo();
+    el.hidden = !info.visible;
+    if (!info.visible) return;
+    const c = giftCopy(info), live = info.canCrack || info.canOpen;
+    let dots = ""; for (let k = 0; k < info.total; k++) dots += '<i class="' + (k < info.cracked ? "on" : "") + '"></i>';
+    el.className = "gift" + (info.g.opened ? " revealed" : "");
+    el.innerHTML =
+      '<div class="gf-head"><span class="gf-kicker">' + esc(c.kicker) + '</span><span class="gf-when">' + esc(c.when) + '</span></div>' +
+      '<button class="jz" id="jz"' + (live ? "" : " disabled") + ' aria-label="' + esc(info.g.opened ? GIFT.name + " running shoes" : c.title + " " + c.sub) + '">' + giftSvg(info) + '</button>' +
+      '<div class="gf-foot"><div class="gf-txt"><div class="gf-title">' + esc(c.title) + '</div><p class="gf-sub">' + esc(c.sub) + '</p>' +
+        (c.clue ? '<span class="gf-clue">' + esc(c.clue) + '</span>' : '') + (c.sign ? '<div class="gf-sign">' + esc(c.sign) + '</div>' : '') + '</div>' +
+        (info.g.opened ? '' : '<div class="gf-dots" aria-label="' + info.cracked + ' of ' + info.total + ' pieces cracked">' + dots + '</div>') + '</div>';
+    $("jz").addEventListener("click", () => {
+      if (giftBusy) return;
+      const now = giftInfo();
+      if (now.canCrack) crackToday(now); else if (now.canOpen) openGift(now);
+    });
+  }
+
+  // --- the crack: lines race out from a point, then the piece falls away in shards
+  const SVG_NS = "http://www.w3.org/2000/svg";
+  function svgEl(tag, attrs) { const n = document.createElementNS(SVG_NS, tag); Object.keys(attrs || {}).forEach(k => n.setAttribute(k, attrs[k])); return n; }
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  let fxList = [], fxOn = false, fxLast = 0;
+  function fxTick(now) {
+    const dt = Math.min(0.05, Math.max(0, (now - fxLast) / 1000)); fxLast = now;
+    fxList = fxList.filter(p => { p.t += dt; if (p.t >= p.life) { p.end(); return false; } p.step(dt); return true; });
+    if (fxList.length) requestAnimationFrame(fxTick); else fxOn = false;
+  }
+  function addFx(p) { p.t = 0; fxList.push(p); if (!fxOn) { fxOn = true; fxLast = performance.now(); requestAnimationFrame(fxTick); } }
+
+  function crackPiece(svg, i, fast) {
+    return new Promise(done => {
+      const piece = svg.querySelector('.jz-piece[data-i="' + i + '"]');
+      if (!piece) { done(); return; }
+      const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const hole = svgEl("path", { class: "jz-hole", d: JZ_PATHS[i] });
+      if (still) { piece.replaceWith(hole); done(); return; }
+      const cx = (i % GIFT.cols + 0.5) * PW + rnd(-12, 12), cy = (Math.floor(i / GIFT.cols) + 0.5) * PH + rnd(-12, 12);
+      const n = 5 + (Math.random() < 0.5 ? 1 : 0), a0 = rnd(0, Math.PI * 2), R = 160, rays = [];
+      for (let k = 0; k < n; k++) {
+        const a = a0 + (k + rnd(-0.22, 0.22)) / n * Math.PI * 2, ma = a + rnd(-0.4, 0.4), mr = rnd(20, 36);
+        rays.push({ a: a, mx: cx + Math.cos(ma) * mr, my: cy + Math.sin(ma) * mr, ex: cx + Math.cos(a) * R, ey: cy + Math.sin(a) * R });
+      }
+      const f1 = x => x.toFixed(1);
+      const lines = svgEl("g", { "clip-path": "url(#jzc" + i + ")" });
+      rays.forEach(q => lines.appendChild(svgEl("path", { class: "jz-crack", pathLength: 1, d: "M" + f1(cx) + " " + f1(cy) + "L" + f1(q.mx) + " " + f1(q.my) + "L" + f1(q.ex) + " " + f1(q.ey) })));
+      piece.appendChild(lines);
+      piece.classList.remove("jz-next", "jz-open"); piece.classList.add("jz-shake");
+      setTimeout(() => {
+        const fx = svg.querySelector(".jz-fx"), defs = svg.querySelector("defs");
+        piece.replaceWith(hole);
+        rays.forEach((q, k) => {
+          const q2 = rays[(k + 1) % n], id = "jzs" + i + "_" + k;
+          const cp = svgEl("clipPath", { id: id });
+          cp.appendChild(svgEl("polygon", { points: [cx, cy, q.mx, q.my, q.ex, q.ey, q2.ex, q2.ey, q2.mx, q2.my].map(f1).join(" ") }));
+          defs.appendChild(cp);
+          const g = svgEl("g", { "clip-path": "url(#" + id + ")" }), inner = svgEl("g", { "clip-path": "url(#jzc" + i + ")" });
+          inner.appendChild(svgEl("use", { href: "#jzCover" })); g.appendChild(inner); fx.appendChild(g);
+          const am = q.a + ((q2.a - q.a + Math.PI * 4) % (Math.PI * 2)) / 2, sp = rnd(40, 120);
+          const s = { x: 0, y: 0, vx: Math.cos(am) * sp, vy: Math.sin(am) * sp - 50, rot: 0, vr: rnd(-170, 170), px: cx + Math.cos(am) * 34, py: cy + Math.sin(am) * 34 };
+          addFx({ life: fast ? 0.75 : 0.9,
+            step(dt) { s.vy += 560 * dt; s.x += s.vx * dt; s.y += s.vy * dt; s.rot += s.vr * dt;
+              g.setAttribute("transform", "translate(" + f1(s.x) + " " + f1(s.y) + ") rotate(" + f1(s.rot) + " " + f1(s.px) + " " + f1(s.py) + ")");
+              g.setAttribute("opacity", (1 - Math.pow(this.t / this.life, 2)).toFixed(2)); },
+            end() { g.remove(); cp.remove(); } });
+        });
+        for (let k = 0; k < (fast ? 6 : 12); k++) {
+          const a = rnd(0, Math.PI * 2), sp = rnd(60, 230), dot = svgEl("circle", { r: rnd(1.2, 3), fill: k % 3 ? "#FFE2A8" : "#fff" });
+          const s = { x: cx, y: cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp };
+          fx.appendChild(dot);
+          addFx({ life: rnd(0.35, 0.7),
+            step(dt) { s.vy += 260 * dt; s.x += s.vx * dt; s.y += s.vy * dt;
+              dot.setAttribute("cx", f1(s.x)); dot.setAttribute("cy", f1(s.y)); dot.setAttribute("opacity", (1 - this.t / this.life).toFixed(2)); },
+            end() { dot.remove(); } });
+        }
+        if (navigator.vibrate) { try { navigator.vibrate(fast ? 8 : 18); } catch (e) { /* ignore */ } }
+        setTimeout(done, fast ? 800 : 950);
+      }, fast ? 150 : 290);
+    });
+  }
+
+  async function crackToday(info) {
+    giftBusy = true;
+    await crackPiece($("jz").querySelector("svg"), GIFT.order[info.cracked], false);
+    info.g.days.push(info.t); giftSave();
+    giftBusy = false;
+    renderGift();
+  }
+
+  async function openGift(info) {
+    giftBusy = true;
+    const el = $("gift"), svg = $("jz").querySelector("svg"), left = GIFT.order.slice(info.cracked);
+    $("jz").disabled = true;
+    left.forEach((i, k) => setTimeout(() => crackPiece(svg, i, true), k * 95));
+    await new Promise(r => setTimeout(r, left.length * 95 + 260));
+    info.g.opened = true; giftSave();
+    const c = giftCopy(giftInfo());
+    el.classList.add("revealed", "revealing");
+    el.querySelector(".gf-kicker").textContent = c.kicker;
+    el.querySelector(".gf-when").textContent = c.when;
+    el.querySelector(".gf-title").textContent = c.title;
+    el.querySelector(".gf-sub").textContent = c.sub;
+    const clue = el.querySelector(".gf-clue"); if (clue) clue.remove();
+    const dots = el.querySelector(".gf-dots"); if (dots) dots.remove();
+    const sign = document.createElement("div"); sign.className = "gf-sign"; sign.textContent = c.sign; el.querySelector(".gf-txt").appendChild(sign);
+    $("jz").setAttribute("aria-label", GIFT.name + " running shoes");
+    const box = $("jz").getBoundingClientRect();
+    confetti(160, { x: box.left + box.width / 2, y: box.top + box.height * 0.6 });
+    if (navigator.vibrate) { try { navigator.vibrate([30, 50, 30, 50, 80]); } catch (e) { /* ignore */ } }
+    setTimeout(() => { el.classList.remove("revealing"); svg.querySelectorAll(".jz-hole").forEach(h => h.remove()); giftBusy = false; }, 3200);
+  }
+
   // ---------- splash: cinematic landing ----------
   (function splash() {
     const el = $("splash");
@@ -1774,7 +2097,41 @@
       part.innerHTML = [...part.textContent].map(ch => '<span class="l" style="--i:' + (i++) + '">' + ch + "</span>").join("");
     });
 
-    // embers drifting up out of the dark
+    // the three numbers: days to go, how far through the season, sessions ticked
+    const race = nextRaceInfo(), pct = seasonPct();
+    $("ssDays").setAttribute("data-to", race ? TP.daysBetween(today, race.iso) : 0);
+    $("ssPct").setAttribute("data-to", pct);
+    $("ssDone").setAttribute("data-to", Object.keys(state.done).filter(k => state.done[k]).length);
+    const nums = [...el.querySelectorAll(".ss b")];
+    const paint = f => nums.forEach(b => { b.textContent = Math.round(Number(b.getAttribute("data-to")) * f) + (b.getAttribute("data-suffix") || ""); });
+    const rollUp = () => {
+      const t0 = performance.now();
+      (function step(now) {
+        const f = Math.min(1, (now - t0) / 1300);
+        paint(1 - Math.pow(1 - f, 3));
+        if (f < 1 && running) requestAnimationFrame(step); else paint(1);
+      })(t0);
+    };
+    // the bright arc of the HUD is the season so far
+    const arc = () => { $("hudProg").style.strokeDasharray = pct + " 100"; };
+    if (still) { paint(1); arc(); } else { paint(0); setTimeout(rollUp, 2050); setTimeout(arc, 1250); }
+
+    // what's waiting inside: today's session, and the surprise if there's a piece to crack
+    const real = sessionsOfDay(today).filter(s => s.type !== "rest"), chips = [];
+    if (real.length) chips.push('<span class="sp-chip">' + (ICONS[real[0].type] || "") + " Today · " + esc(shortTitle(real[0].title)) + (real.length > 1 ? " +" + (real.length - 1) : "") + '</span>');
+    else if (sessionsOfDay(today).length) chips.push('<span class="sp-chip">🌙 Today · Rest day</span>');
+    const gi = giftInfo();
+    if (gi.visible && (gi.canCrack || gi.canOpen)) chips.push('<span class="sp-chip gift">🎁 ' + (gi.canOpen ? "Your surprise is ready" : "A piece is waiting for you") + '</span>');
+    $("spChips").innerHTML = chips.join("");
+
+    // rays and flash sit behind the emblem, wherever the layout puts it
+    const centre = () => {
+      const r = emblem.getBoundingClientRect();
+      if (r.height) el.style.setProperty("--sp-cy", ((r.top + r.height / 2) / innerHeight * 100).toFixed(1) + "%");
+    };
+    centre(); addEventListener("resize", centre);
+
+    // embers drifting up out of the dark; a tap throws up a handful more
     const cv = document.getElementById("spEmbers"), cx = cv.getContext("2d");
     let W = 0, H = 0, dpr = 1, motes = [];
     const size = () => {
@@ -1783,7 +2140,7 @@
     };
     const spawn = (y) => ({
       x: Math.random() * W, y: y != null ? y : H + Math.random() * H * 0.2,
-      r: (0.6 + Math.random() * 1.9) * dpr, v: (0.35 + Math.random() * 1.1) * dpr,
+      r: (0.6 + Math.random() * 1.9) * dpr, v: (0.35 + Math.random() * 1.1) * dpr, vx: 0,
       w: Math.random() * Math.PI * 2, ws: 0.008 + Math.random() * 0.02,
       a: 0.25 + Math.random() * 0.6, hue: 350 + Math.random() * 30
     });
@@ -1792,10 +2149,12 @@
       if (!H) { size(); requestAnimationFrame(tick); return; }
       cx.clearRect(0, 0, W, H);
       cx.globalCompositeOperation = "lighter";
+      motes = motes.filter(m => !(m.burst && (m.y < -10 || m.a < 0.03)));
       motes.forEach((m, k) => {
-        m.y -= m.v; m.w += m.ws; m.x += Math.sin(m.w) * 0.45 * dpr;
-        if (m.y < -10) { motes[k] = spawn(); return; }
-        const fade = H ? Math.max(0, Math.min(1, m.y / (H * 0.35))) : 0;   // dim out near the top
+        m.y -= m.v; m.w += m.ws; m.x += Math.sin(m.w) * 0.45 * dpr + m.vx;
+        if (m.burst) { m.vx *= 0.96; m.v = m.v * 0.97 + 0.03 * dpr; m.a *= 0.985; }
+        else if (m.y < -10) { motes[k] = spawn(); return; }
+        const fade = Math.max(0, Math.min(1, m.y / (H * 0.35)));   // dim out near the top
         const g = cx.createRadialGradient(m.x, m.y, 0, m.x, m.y, m.r * 4);
         g.addColorStop(0, "hsla(" + m.hue + ",100%,72%," + (m.a * fade) + ")");
         g.addColorStop(1, "hsla(" + m.hue + ",100%,50%,0)");
@@ -1816,6 +2175,13 @@
         emblem.style.setProperty("--rx", (-y * 22).toFixed(2) + "deg");
       });
       el.addEventListener("pointerleave", () => { emblem.style.setProperty("--rx", "0deg"); emblem.style.setProperty("--ry", "0deg"); });
+      el.addEventListener("pointerdown", e => {
+        if (e.target.closest("button") || motes.length > 220) return;
+        for (let k = 0; k < 16; k++) {
+          const a = Math.random() * Math.PI * 2, sp = (1 + Math.random() * 4) * dpr;
+          motes.push(Object.assign(spawn(e.clientY * dpr), { x: e.clientX * dpr, vx: Math.cos(a) * sp, v: Math.sin(a) * sp + 1.5 * dpr, a: 0.9, hue: k % 4 ? 350 + Math.random() * 30 : 42, burst: true }));
+        }
+      });
     }
 
     const reveal = () => {
@@ -1833,10 +2199,16 @@
   })();
 
   if ("scrollRestoration" in history) history.scrollRestoration = "manual";
+  // Left open overnight (it lives on her home screen), the page would still think
+  // it's yesterday — so when she comes back to it on a new day, start afresh.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && TP.iso(new Date()) !== today) location.reload();
+  });
   setLockUI();
   let startTab = "today"; try { startTab = sessionStorage.getItem("htp_tab") || "today"; } catch (e) { /* ignore */ }
   relink();
   showView(TITLES[startTab] ? startTab : "today");
+  renderGift();
   renderReview(); renderUpNext(); recomputeStats();
   // Auto-ticking waits for the cloud copy of her ticks — otherwise a slow load
   // would land on top of fresh Garmin ticks and quietly undo them.

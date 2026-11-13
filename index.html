@@ -17,20 +17,25 @@
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="stylesheet" href="styles.css?v=45">
+<link rel="stylesheet" href="styles.css?v=46">
 </head>
 <body>
 
   <!-- ============ LANDING ============ -->
-  <div class="splash" id="splash" role="img" aria-label="Ironman — Harriet's journey">
-    <canvas class="sp-embers" id="spEmbers" aria-hidden="true"></canvas>
+  <div class="splash" id="splash" role="img" aria-label="Ironman 70.3 — Harriet's journey">
+    <div class="sp-aurora" aria-hidden="true"></div>
     <div class="sp-rays" aria-hidden="true"></div>
+    <div class="sp-floor" aria-hidden="true"><div class="sp-grid"></div></div>
+    <div class="sp-horizon" aria-hidden="true"></div>
+    <canvas class="sp-embers" id="spEmbers" aria-hidden="true"></canvas>
     <div class="sp-flash" aria-hidden="true"></div>
     <div class="splash-inner">
+      <div class="sp-top">Harriet Meers <i></i> Season 2026–27</div>
       <div class="sp-emblem" id="spEmblem">
         <svg class="sp-hud" viewBox="0 0 400 400" aria-hidden="true">
           <circle class="hud-ticks" cx="200" cy="200" r="188"/>
-          <circle class="hud-arc a1" cx="200" cy="200" r="170"/>
+          <circle class="hud-track" cx="200" cy="200" r="170"/>
+          <circle class="hud-prog" id="hudProg" cx="200" cy="200" r="170" pathLength="100"/>
           <circle class="hud-arc a2" cx="200" cy="200" r="154"/>
           <circle class="hud-dots" cx="200" cy="200" r="140"/>
         </svg>
@@ -65,10 +70,20 @@
           <g class="md-reg"><circle cx="223" cy="290" r="9"/><text x="223" y="294" text-anchor="middle">R</text></g>
         </svg>
       </div>
-      <div class="splash-word" data-text="IRONMAN 70.3"><span class="sw-a">IRONMAN</span> <span class="sw-b">70.3</span></div>
-      <div class="splash-name"><span>Harriet's journey</span></div>
-      <div class="splash-sig">from your best friend, Ali</div>
-      <button class="splash-enter" id="splashSkip">Enter <span>→</span></button>
+      <div class="sp-title">
+        <div class="splash-word" data-text="IRONMAN 70.3"><span class="sw-a">IRONMAN</span> <span class="sw-b">70.3</span></div>
+        <div class="splash-name"><span>Harriet's journey</span></div>
+      </div>
+      <div class="sp-stats" id="spStats">
+        <div class="ss"><b id="ssDays" data-to="0">0</b><span>days to go</span></div>
+        <div class="ss"><b id="ssPct" data-to="0" data-suffix="%">0%</b><span>of the season</span></div>
+        <div class="ss"><b id="ssDone" data-to="0">0</b><span>sessions done</span></div>
+      </div>
+      <div class="sp-chips" id="spChips"></div>
+      <div class="sp-cta">
+        <button class="splash-enter" id="splashSkip">Let's go <span>→</span></button>
+        <div class="splash-sig">from your best friend, Ali</div>
+      </div>
     </div>
   </div>
 
@@ -104,15 +119,26 @@
 
         <!-- one card that answers "how am I today?" — readiness, form, countdown -->
         <section class="hero card" id="hero" data-level="none">
-          <div class="hero-top">
-            <span class="hero-kicker" id="heroPhase">—</span>
-            <span class="hero-count"><b id="heroCountdown">–</b> days to go</span>
+          <div class="hero-main">
+            <div class="hero-txt">
+              <span class="hero-kicker" id="heroPhase">—</span>
+              <div class="hero-head" id="heroHead">Hello</div>
+              <p class="hero-note" id="heroNote"></p>
+            </div>
+            <div class="hero-ring" aria-label="Days to race day">
+              <svg viewBox="0 0 84 84" aria-hidden="true">
+                <circle class="hr-track" cx="42" cy="42" r="36"/>
+                <circle class="hr-prog" id="heroRing" cx="42" cy="42" r="36" pathLength="100"/>
+              </svg>
+              <div class="hr-in"><b id="heroCountdown">–</b><span>days to go</span></div>
+            </div>
           </div>
-          <div class="hero-head" id="heroHead">Hello</div>
-          <p class="hero-note" id="heroNote"></p>
           <div class="hero-metrics" id="heroMetrics"></div>
           <div class="hero-sugg" id="heroSugg" hidden></div>
         </section>
+
+        <!-- a surprise from Ali: one jigsaw piece cracks open each day she checks in -->
+        <section class="gift" id="gift" hidden></section>
 
         <div class="sec-head">
           <h2>Today</h2>
@@ -218,70 +244,13 @@
           <h1>Progress</h1>
         </div>
 
-        <section class="fitness card" id="fitness" hidden>
-          <div class="card-head">
-            <span class="card-kicker">Fitness</span>
-            <span class="chip" id="fitVerdict">–</span>
-          </div>
-          <div class="big-line">
-            <span class="big-n" id="fitCtl">–</span>
-            <span class="big-d" id="fitCtlSub"></span>
-          </div>
-          <div class="kv-line"><span>Fatigue <b id="fitAtl">–</b></span><span>Form <b id="fitForm">–</b></span></div>
-          <div class="chart" id="fitChart"></div>
-          <p class="card-foot" id="fitNote"></p>
+        <section class="stats">
+          <div class="stat card"><div class="n" id="stat-week">0/0</div><div class="l">this week</div><div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
+          <div class="stat card"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
+          <div class="stat card"><div class="n" id="stat-total">0</div><div class="l">sessions done</div></div>
         </section>
 
-        <section class="hours card" id="hours" hidden>
-          <div class="card-head">
-            <span class="card-kicker">Training time · last 12 weeks</span>
-          </div>
-          <div class="big-line">
-            <span class="big-n" id="hoursNow">–</span>
-            <span class="big-d" id="hoursSub"></span>
-          </div>
-          <div class="chart" id="hoursChart"></div>
-        </section>
-
-        <section class="predict card" id="predict" hidden>
-          <div class="card-head">
-            <span class="card-kicker">Ironman 70.3 · estimate today</span>
-          </div>
-          <div class="big-line">
-            <span class="big-n" id="predTotal">–</span>
-            <span class="big-d" id="predRange"></span>
-          </div>
-          <div class="legs" id="predLegs"></div>
-          <p class="card-foot" id="predFoot"></p>
-        </section>
-
-        <section class="card race-ready" id="raceCard" hidden>
-          <div class="card-head"><span class="card-kicker">Race-distance check · last 8 weeks</span></div>
-          <div id="raceReady"></div>
-          <div class="card-foot" id="seasonTotals"></div>
-        </section>
-
-        <section class="css card" id="cssCard">
-          <div class="card-head">
-            <span class="card-kicker">Swim pace · CSS</span>
-            <span class="chip" id="cssSrc"></span>
-          </div>
-          <div class="big-line">
-            <span class="big-n" id="cssVal">–</span>
-            <span class="big-d" id="cssSub"></span>
-          </div>
-          <p class="card-foot" id="cssFoot"></p>
-          <button class="text-btn" id="cssEdit">Enter test times</button>
-          <div class="css-form" id="cssForm" hidden>
-            <label>400 m time<input id="css400" inputmode="numeric" placeholder="8:40"></label>
-            <label>200 m time<input id="css200" inputmode="numeric" placeholder="4:05"></label>
-            <button class="pill-btn solid" id="cssSave">Save</button>
-          </div>
-        </section>
-
-        <div class="sec-head">
-          <h2>Week review</h2>
-        </div>
+        <div class="sec-head"><h2>Week review</h2></div>
         <section class="review card" id="review">
           <div class="rv-head">
             <button class="round-btn" id="rvPrev" aria-label="Previous week"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -307,12 +276,6 @@
             <div class="saved-tag" id="rvSaved"></div>
           </div>
         </section>
-
-        <section class="stats">
-          <div class="stat card"><div class="n" id="stat-week">0/0</div><div class="l">this week</div><div class="progress"><i id="week-bar" style="width:0%"></i></div></div>
-          <div class="stat card"><div class="n" id="stat-streak">0</div><div class="l">day streak</div></div>
-          <div class="stat card"><div class="n" id="stat-total">0</div><div class="l">sessions done</div></div>
-        </section>
         <section class="polar card">
           <div class="card-head">
             <span class="card-kicker">This week · 80/20 polarized</span>
@@ -326,6 +289,66 @@
           <div class="polar-sub" id="polarSub">Mostly easy, so the hard days count.</div>
           <div class="cal-sub"><b id="stat-race">–</b> <span id="stat-race-l">days to Ironman 70.3</span></div>
         </section>
+
+        <div class="sec-head" id="fitHead"><h2>Fitness</h2><span class="sec-meta">from her watch</span></div>
+        <section class="fitness card" id="fitness" hidden>
+          <div class="card-head">
+            <span class="card-kicker">Fitness</span>
+            <span class="chip" id="fitVerdict">–</span>
+          </div>
+          <div class="big-line">
+            <span class="big-n" id="fitCtl">–</span>
+            <span class="big-d" id="fitCtlSub"></span>
+          </div>
+          <div class="kv-line"><span>Fatigue <b id="fitAtl">–</b></span><span>Form <b id="fitForm">–</b></span></div>
+          <div class="chart" id="fitChart"></div>
+          <p class="card-foot" id="fitNote"></p>
+        </section>
+        <section class="hours card" id="hours" hidden>
+          <div class="card-head">
+            <span class="card-kicker">Training time · last 12 weeks</span>
+          </div>
+          <div class="big-line">
+            <span class="big-n" id="hoursNow">–</span>
+            <span class="big-d" id="hoursSub"></span>
+          </div>
+          <div class="chart" id="hoursChart"></div>
+        </section>
+
+        <div class="sec-head"><h2>Race readiness</h2></div>
+        <section class="predict card" id="predict" hidden>
+          <div class="card-head">
+            <span class="card-kicker">Ironman 70.3 · estimate today</span>
+          </div>
+          <div class="big-line">
+            <span class="big-n" id="predTotal">–</span>
+            <span class="big-d" id="predRange"></span>
+          </div>
+          <div class="legs" id="predLegs"></div>
+          <p class="card-foot" id="predFoot"></p>
+        </section>
+        <section class="card race-ready" id="raceCard" hidden>
+          <div class="card-head"><span class="card-kicker">Race-distance check · last 8 weeks</span></div>
+          <div id="raceReady"></div>
+          <div class="card-foot" id="seasonTotals"></div>
+        </section>
+        <section class="css card" id="cssCard">
+          <div class="card-head">
+            <span class="card-kicker">Swim pace · CSS</span>
+            <span class="chip" id="cssSrc"></span>
+          </div>
+          <div class="big-line">
+            <span class="big-n" id="cssVal">–</span>
+            <span class="big-d" id="cssSub"></span>
+          </div>
+          <p class="card-foot" id="cssFoot"></p>
+          <button class="text-btn" id="cssEdit">Enter test times</button>
+          <div class="css-form" id="cssForm" hidden>
+            <label>400 m time<input id="css400" inputmode="numeric" placeholder="8:40"></label>
+            <label>200 m time<input id="css200" inputmode="numeric" placeholder="4:05"></label>
+            <button class="pill-btn solid" id="cssSave">Save</button>
+          </div>
+        </section>
       </section>
 
       <!-- ===================== JOURNEY ===================== -->
@@ -337,7 +360,8 @@
         <div class="card intro">
           <p>The summer's two blocks, then <b>Phil's 24-week half-distance plan</b> from MyProCoach: base, three build blocks, two peak blocks and a taper. Most of it is easy and aerobic, with a small, sharp slice of hard work. That's what turns months of Zone 2 into an Ironman.</p>
           <div class="season">
-            <div class="season-bar"><i id="seasonFill"></i></div>
+            <div class="season-now" id="seasonNow"></div>
+            <div class="season-bar" id="seasonBar"></div>
             <div class="season-l"><span>27 Jul 2026</span><b id="seasonPct">0%</b><span>28 Mar 2027</span></div>
           </div>
         </div>
@@ -354,7 +378,8 @@
     </main>
 
     <!-- bottom tab bar -->
-    <nav class="tabbar" role="tablist" aria-label="Sections">
+    <nav class="tabbar" id="tabbar" role="tablist" aria-label="Sections">
+      <i class="tab-ind" aria-hidden="true"></i>
       <button class="tab active" data-view="today" role="tab" aria-label="Today">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>
         <span>Today</span>
@@ -414,7 +439,7 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="data.js?v=12"></script>
-  <script src="app.js?v=45"></script>
+  <script src="data.js?v=13"></script>
+  <script src="app.js?v=46"></script>
 </body>
 </html>
