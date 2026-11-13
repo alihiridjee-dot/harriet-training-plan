@@ -10,6 +10,12 @@
   const BLOCK1_END = "2026-09-27";   // Sunday — last day of the summer Foundation block
   const DOLOMITES = ["2026-08-24", "2026-08-27"]; // Mon–Thu camp (assumed; edit if needed)
   const PLAN24 = "2026-10-12";       // Monday, week 1 of Phil's 24-week plan (MyProCoach)
+  // Harriet fell a week behind in November, so the plan was pushed back a week:
+  // 9–15 Nov is a catch-up week (it keeps the sessions that were already on those
+  // days, as optional extras) and Build 1 week 1 starts again on Monday 16 Nov.
+  // Race day can't move, so one Build 2 load week was dropped to make the room.
+  const CATCHUP = "2026-11-09";      // Monday of the catch-up week
+  const RESTART = "2026-11-16";      // Monday, Build 1 week 1
   const RACE_703 = "2027-03-28";     // Ironman 70.3 — the plan's race day, week 24 Sunday
 
   // ---------- date helpers (local, noon-anchored to avoid TZ drift) ----------
@@ -213,7 +219,8 @@
     if (weekIdx <= 8) return { id: "p1", label: "Block 1 · Foundation", tint: "p1" };
     if (isoStr < PLAN24) return { id: "recovery", label: "Block 2 · Reset", tint: "recovery" };
     if (isoStr > RACE_703) return { id: "post", label: "After the 70.3", tint: "post" };
-    const b = blockOf(WEEKS[Math.floor(daysBetween(PLAN24, isoStr) / 7)].b);
+    if (isCatchup(isoStr)) return { id: "base", label: "Catch-up week", tint: "base" };
+    const b = blockOf(WEEKS[weekIdx24(isoStr)].b);
     return { id: b.id, label: b.name, tint: b.tint };
   }
 
@@ -274,7 +281,8 @@
   }
 
   // ============================================================
-  // Phil's 24-week plan (MyProCoach) — 12 Oct 2026 → race day
+  // Phil's 24-week plan (MyProCoach) — 12 Oct 2026 → race day, run as 23 weeks
+  // plus a catch-up week (see CATCHUP / RESTART at the top)
   // ============================================================
   // "Phil's Intermediate Half Distance Triathlon 24-Week Plan", as it sits in her
   // TrainingPeaks calendar. The PDF export cut most workouts' text short, so the
@@ -285,7 +293,7 @@
 
   // Threshold run pace in seconds per km, behind every run pace on her watch.
   // ~5:27/km from her 1:58:59 half; after each run test (plan weeks 1, 8 and
-  // 16) set it to her average pace for the 30-minute effort.
+  // 15) set it to her average pace for the 30-minute effort.
   const RUN_THR = 327;
 
   // The plan's zones: [words, run pace as % of threshold pace (slowest, fastest),
@@ -444,7 +452,7 @@
   const EST_SWIM = "Rebuilt from this workout's chart in the plan — the PDF cut most of the text off. Distances and efforts follow the chart; TrainingPeaks has Phil's exact set and drills.";
   const EST_GUESS = "The PDF hides this whole set, so it's modelled on the plan's other swims of this kind — check TrainingPeaks for Phil's exact set.";
 
-  // ---------- fitness tests (plan weeks 1, 8 and 16) ----------
+  // ---------- fitness tests (plan weeks 1, 8 and 15) ----------
   const CSS_TEST = () => {
     const s = W(S("swim", "Swim — CSS test", "≈ 1,200 m · fitness test", [
       { label: "Warm-up", text: "6 × (50 m steady in Z2 + 15 s rest), then a couple of minutes' easy rest." },
@@ -602,7 +610,7 @@
     { label: "You've got this", text: "One build, one goal, all of it earned. Enjoy the finish line." }
   ]);
 
-  // ---------- the 24 weeks ----------
+  // ---------- the weeks (Phil's 24, less the Build 2 week dropped for the catch-up) ----------
   // b: block (see BLOCKS) · easy: an active-recovery week · tips: MyProCoach
   // reading per weekday (0 = Mon) · days(): Monday → Sunday sessions
   const TIPS = {
@@ -697,7 +705,7 @@
       [REST()],
       [SUB_RIDE(195, 90, 3, 12, 3, "3 × 12′ upper Z3–low Z4"), OFF_BIKE(20)],
       [LONG(100)]] },
-    { b: "build2", banner: BUILD2, days: () => [
+    { b: "build2", banner: BUILD2 + " Christmas Day is a rest day.", days: () => [
       [AE_2600()],
       [SLOPE(63, [[9, 5], [7, 4], [5, 4]])],
       [SUSTAINED(54, 3, 9, 3)],
@@ -705,14 +713,6 @@
       [REST()],
       [SUB_RIDE(195, 90, 2, 20, 3, "2 × 20′ upper Z3–low Z4"), OFF_BIKE(25)],
       [LONG(110)]] },
-    { b: "build2", banner: BUILD2 + " Christmas Day is a rest day.", days: () => [
-      [AE_2600()],
-      [SLOPE(64, [[9, 6], [7, 4], [5, 4]])],
-      [SUSTAINED(57, 3, 10, 3)],
-      [TORQUE(56, ["15m Z2"], [rep(2, ["15m Z3 60rpm", "3m Z2"])], ["5m Z2"]), TH_2600()],
-      [REST()],
-      [SUB_RIDE(195, 95, 1, 40, 0, "40′ upper Z3–low Z4"), OFF_BIKE(30)],
-      [LONG(120)]] },
     { b: "build2", easy: true, banner: "Active recovery over New Year — easy sessions. You're halfway through the plan.",
       tips: { 5: ["halfway"] }, days: () => [
       [REC_1600()],
@@ -821,8 +821,22 @@
       [RACE()]] }
   ];
 
+  // Which of WEEKS a date falls in. Everything from RESTART on sits a week later
+  // than Phil's original calendar; the catch-up week borrows Build 1 week 1.
+  const isCatchup = isoStr => isoStr >= CATCHUP && isoStr < RESTART;
+  function weekIdx24(isoStr) {
+    const wi = Math.floor(daysBetween(PLAN24, isoStr) / 7);
+    return isoStr < CATCHUP ? wi : isCatchup(isoStr) ? wi : wi - 1;
+  }
   function plan24Day(isoStr) {
-    const wi = Math.floor(daysBetween(PLAN24, isoStr) / 7), wd = weekdayMon0(isoStr), w = WEEKS[wi];
+    const wi = weekIdx24(isoStr), wd = weekdayMon0(isoStr), w = WEEKS[wi];
+    if (isCatchup(isoStr)) {
+      return {
+        sessions: w.days()[wd].map(s => s.type === "rest" ? s : Object.assign(s, { optional: true })),
+        banner: "Catch-up week — Build 1 starts fresh on Monday 16 November. Anything you get done this week is a bonus, so nothing here counts as missed.",
+        easyWeek: true, tips: []
+      };
+    }
     return {
       sessions: w.days()[wd],
       banner: isoStr === RACE_703 ? "RACE DAY. Trust the training. Nothing new — just execution." : w.banner,
@@ -860,7 +874,7 @@
       iso: isoStr,
       phase: phase,
       weekNum: phase.id === "p1" ? weekIdx + 1 : (body.weekNum || null),
-      weekOf: body.weekOf || null,     // "Week 3 of 24" in Phil's plan
+      weekOf: body.weekOf || null,     // "Week 3 of 23" in Phil's plan
       easyWeek: !!body.easyWeek,       // a recovery week — the plan wants it easy
       dayName: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][wd],
       banner: body.banner,
@@ -904,25 +918,25 @@
       focus: "Two deliberately easy weeks. Nothing hard, nothing over 10 km — let the summer block soak in before the 70.3 build.",
       key: ["Easy movement", "Short swims", "No long runs"] },
     // Phil's 24-week plan, phase by phase
-    { id: "base", n: 3, name: "Base", start: PLAN24, end: "2026-11-08",
+    { id: "base", n: 3, name: "Base", start: PLAN24, end: "2026-11-15",
       points: "Aerobic engine", tint: "base",
-      focus: "Three fitness tests set your zones, then the aerobic engine: a long Z2 ride and run, one threshold bike, one speed run and two swims a week. Week 4 is easy.",
+      focus: "Three fitness tests set your zones, then the aerobic engine: a long Z2 ride and run, one threshold bike, one speed run and two swims a week. Week 4 is easy, then a catch-up week before Build 1.",
       key: ["3 fitness tests", "Threshold bike", "Speed run", "Long Z2 ride & run"] },
-    { id: "build1", n: 4, name: "Build 1", start: "2026-11-09", end: "2026-12-06",
+    { id: "build1", n: 4, name: "Build 1", start: RESTART, end: "2026-12-13",
       points: "Speed & strength", tint: "build",
       focus: "Speed sessions on the bike and run, big-gear torque rides, and 3-hour rides with sub-threshold efforts and a run off the bike. Week 8: easy week and retests.",
       key: ["Speed bike & run", "Torque ride", "3 h ride + brick", "Long run to 90 min"] },
-    { id: "build2", n: 5, name: "Build 2", start: "2026-12-07", end: "2027-01-03",
+    { id: "build2", n: 5, name: "Build 2", start: "2026-12-14", end: "2027-01-03",
       points: "Race-specific", tint: "build",
-      focus: "70.3 power slopes on the bike, sustained Z3 runs, threshold swims and 3 h 15 rides with longer efforts. Easy over New Year.",
-      key: ["70.3 power slope", "Sustained Z3 run", "Threshold swim", "Long run to 2 h"] },
+      focus: "70.3 power slopes on the bike, sustained Z3 runs, threshold swims and 3 h 15 rides with longer efforts. One load week shorter than Phil's original, to make up the catch-up week. Easy over New Year.",
+      key: ["70.3 power slope", "Sustained Z3 run", "Threshold swim", "Long run to 1 h 50"] },
     { id: "build3", n: 6, name: "Build 3", start: "2027-01-04", end: "2027-01-31",
       points: "Biggest weeks", tint: "build",
-      focus: "3 h 30 rides with sub-threshold blocks and a faster run off the bike, 2-hour long runs and the longest swims. Week 16: easy week and final retests.",
+      focus: "3 h 30 rides with sub-threshold blocks and a faster run off the bike, 2-hour long runs and the longest swims. Week 15: easy week and final retests.",
       key: ["3 h 30 ride + fast brick", "2 h long run", "Long swims"] },
     { id: "peak1", n: 7, name: "Peak 1", start: "2027-02-01", end: "2027-02-28",
       points: "Race practice", tint: "taper",
-      focus: "Rides at race effort followed by long runs off the bike, threshold runs, and open-water swims. Week 20 is easy.",
+      focus: "Rides at race effort followed by long runs off the bike, threshold runs, and open-water swims. Week 19 is easy.",
       key: ["Race-practice brick", "Threshold run", "Open-water swim"] },
     { id: "peak2", n: 8, name: "Peak 2", start: "2027-03-01", end: "2027-03-14",
       points: "Sharpen", tint: "taper",
@@ -972,7 +986,7 @@
   }
 
   const TP = {
-    PLAN_START, PLAN24, RACE_703, DOLOMITES, BLOCKS, currentBlock, watchWorkouts, fromPlan, fmtPace,
+    PLAN_START, PLAN24, RESTART, RACE_703, DOLOMITES, BLOCKS, currentBlock, watchWorkouts, fromPlan, fmtPace,
     getDay, addDays, daysBetween, parse, iso, weekdayMon0, intensityOf, zoneSplit,
     TYPE_META: {
       run:      { label: "Run",      color: "#B0603A" },

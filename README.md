@@ -7,6 +7,18 @@ A calm, aesthetic training-plan website for **Harriet Meers** — one continuous
 From 12 October 2026 the plan is MyProCoach's *Phil's Intermediate Half Distance Triathlon 24-Week Plan*,
 exactly as it sits in her TrainingPeaks calendar; the summer Foundation and Reset blocks before it stay as they were.
 
+**Pushed back a week (November 2026).** Harriet fell a week behind, so 9–15 Nov is a *catch-up week*
+(the sessions already on those days stay, as optional extras — nothing counts as missed) and
+**Build 1 week 1 starts on Monday 16 Nov**. Race day can't move, so the third load week of Build 2 was
+dropped to make the room: from 28 Dec onwards every session is back on its original date. The two dates
+that control this are `CATCHUP` and `RESTART` at the top of `data.js`.
+
+**The surprise (November 2026).** The Today tab carries a jigsaw of wrapping paper over a hidden picture.
+Each new day Harriet opens the site she can tap to crack one piece; on Friday 20 Nov one tap shatters the
+rest and reveals her On Cloudboom shoes. Progress is kept on the device, so opening the site on another
+phone never cracks her pieces. Settings are in `GIFT` in `app.js`. To see the reveal without spoiling or
+saving anything, open the site with `?gift=preview`; `?gift=reset` wraps it back up on that device.
+
 It's a single-page site with a **dynamic calendar**. Tap any day to see the exact sessions, open a
 workout for the full breakdown (sets, paces, drills), tick things off as complete, and jot notes on how
 it went. Progress is saved in the browser on the device you use.
@@ -21,9 +33,9 @@ GitHub Pages.
 | File | What it is |
 |------|------------|
 | `index.html` | Page shell |
-| `styles.css` | Styling (the cream/sage/clay look from the PDF) |
+| `styles.css` | Styling — iPhone-first, light + dark, floating tab bar, the landing page and the jigsaw |
 | `data.js` | The whole plan: schedule engine + workout library. **Edit dates & sessions here.** |
-| `app.js` | Calendar, day drawer, completion + notes (localStorage) |
+| `app.js` | Everything you see: Today, Plan, Progress, Journey, the day sheet, the landing page, the jigsaw surprise |
 
 ---
 
@@ -83,7 +95,7 @@ const RACE_703    = "2027-03-28";              // race day — week 24's Sunday
 - The PDF it came from cut most workouts' text short; the missing steps were read off each workout's
   chart in the PDF. Swim sets are rebuilt from their charts and say so on the site.
 - **`RUN_THR`** is her threshold run pace (seconds per km) behind every run pace on the watch. Update it
-  after each run test (plan weeks 1, 8 and 16) — it's her average pace for the 30-minute effort.
+  after each run test (plan weeks 1, 8 and 15) — it's her average pace for the 30-minute effort.
 - The summer block's sessions (`P1`, `R2`, `LOWER`, …) are untouched so her ticks and notes still line up.
 
 ---
