@@ -7,9 +7,9 @@ A calm, aesthetic training-plan website for **Harriet Meers** — one continuous
 From 12 October 2026 the plan is MyProCoach's *Phil's Intermediate Half Distance Triathlon 24-Week Plan*,
 exactly as it sits in her TrainingPeaks calendar; the summer Foundation and Reset blocks before it stay as they were.
 
-**Pushed back a week (November 2026).** Harriet fell a week behind, so 9–15 Nov is a *catch-up week*
-(the sessions already on those days stay, as optional extras — nothing counts as missed) and
-**Build 1 week 1 starts on Monday 16 Nov**. Race day can't move, so the third load week of Build 2 was
+**Pushed back a week (November 2026).** Harriet fell a week behind, so 9–15 Nov is the *active recovery
+week (week 4) again* — the week she's actually on, with its weekend swapped round to match her (1 h 30
+ride on Saturday, 45-min run on Sunday) — and **Build 1 week 1 starts on Monday 16 Nov**. Race day can't move, so the third load week of Build 2 was
 dropped to make the room: from 28 Dec onwards every session is back on its original date. The two dates
 that control this are `CATCHUP` and `RESTART` at the top of `data.js`.
 

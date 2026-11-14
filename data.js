@@ -11,10 +11,11 @@
   const DOLOMITES = ["2026-08-24", "2026-08-27"]; // Mon–Thu camp (assumed; edit if needed)
   const PLAN24 = "2026-10-12";       // Monday, week 1 of Phil's 24-week plan (MyProCoach)
   // Harriet fell a week behind in November, so the plan was pushed back a week:
-  // 9–15 Nov is a catch-up week (it keeps the sessions that were already on those
-  // days, as optional extras) and Build 1 week 1 starts again on Monday 16 Nov.
-  // Race day can't move, so one Build 2 load week was dropped to make the room.
-  const CATCHUP = "2026-11-09";      // Monday of the catch-up week
+  // she's doing the active recovery week (week 4) again on 9–15 Nov, with its
+  // weekend swapped round to match her (1 h 30 ride Saturday, 45-min run Sunday),
+  // and Build 1 week 1 starts on Monday 16 Nov. Race day can't move, so one
+  // Build 2 load week was dropped to make the room.
+  const CATCHUP = "2026-11-09";      // Monday of the repeated recovery week
   const RESTART = "2026-11-16";      // Monday, Build 1 week 1
   const RACE_703 = "2027-03-28";     // Ironman 70.3 — the plan's race day, week 24 Sunday
 
@@ -219,7 +220,6 @@
     if (weekIdx <= 8) return { id: "p1", label: "Block 1 · Foundation", tint: "p1" };
     if (isoStr < PLAN24) return { id: "recovery", label: "Block 2 · Reset", tint: "recovery" };
     if (isoStr > RACE_703) return { id: "post", label: "After the 70.3", tint: "post" };
-    if (isCatchup(isoStr)) return { id: "base", label: "Catch-up week", tint: "base" };
     const b = blockOf(WEEKS[weekIdx24(isoStr)].b);
     return { id: b.id, label: b.name, tint: b.tint };
   }
@@ -821,20 +821,22 @@
       [RACE()]] }
   ];
 
-  // Which of WEEKS a date falls in. Everything from RESTART on sits a week later
-  // than Phil's original calendar; the catch-up week borrows Build 1 week 1.
+  // Which of WEEKS a date falls in. Everything from CATCHUP on sits a week later
+  // than Phil's original calendar, so the recovery week (week 4) runs twice.
   const isCatchup = isoStr => isoStr >= CATCHUP && isoStr < RESTART;
   function weekIdx24(isoStr) {
     const wi = Math.floor(daysBetween(PLAN24, isoStr) / 7);
-    return isoStr < CATCHUP ? wi : isCatchup(isoStr) ? wi : wi - 1;
+    return isoStr < CATCHUP ? wi : wi - 1;
   }
   function plan24Day(isoStr) {
     const wi = weekIdx24(isoStr), wd = weekdayMon0(isoStr), w = WEEKS[wi];
     if (isCatchup(isoStr)) {
+      // her weekend this time round: the 1 h 30 ride on Saturday, the run on Sunday
+      const d = wd === 5 ? 6 : wd === 6 ? 5 : wd;
       return {
-        sessions: w.days()[wd].map(s => s.type === "rest" ? s : Object.assign(s, { optional: true })),
-        banner: "Catch-up week — Build 1 starts fresh on Monday 16 November. Anything you get done this week is a bonus, so nothing here counts as missed.",
-        easyWeek: true, tips: []
+        sessions: w.days()[d],
+        banner: "Active recovery week — back in step with where you are. Easy 1 h 30 ride on Saturday, 45-minute run on Sunday, and Build 1 starts on Monday 16 November.",
+        weekNum: wi + 1, weekOf: WEEKS.length, easyWeek: true, tips: []
       };
     }
     return {
@@ -920,7 +922,7 @@
     // Phil's 24-week plan, phase by phase
     { id: "base", n: 3, name: "Base", start: PLAN24, end: "2026-11-15",
       points: "Aerobic engine", tint: "base",
-      focus: "Three fitness tests set your zones, then the aerobic engine: a long Z2 ride and run, one threshold bike, one speed run and two swims a week. Week 4 is easy, then a catch-up week before Build 1.",
+      focus: "Three fitness tests set your zones, then the aerobic engine: a long Z2 ride and run, one threshold bike, one speed run and two swims a week. Week 4 is easy — and she ran it twice, so Build 1 starts a week later.",
       key: ["3 fitness tests", "Threshold bike", "Speed run", "Long Z2 ride & run"] },
     { id: "build1", n: 4, name: "Build 1", start: RESTART, end: "2026-12-13",
       points: "Speed & strength", tint: "build",

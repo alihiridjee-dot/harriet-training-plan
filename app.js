@@ -1092,9 +1092,7 @@
     const range = a.getDate() + (a.getMonth() === b.getMonth() ? "" : " " + MON_ABBR[a.getMonth()]) + " – " + b.getDate() + " " + MON_ABBR[b.getMonth()];
     const title = rel === 0 ? "This week" : rel === 1 ? "Next week" : rel === -1 ? "Last week" : range;
     const phase = dayOf(monday).phase.label, w = weekDays(monday);
-    // in the catch-up week everything is a bonus, so there's no "of"
-    const meta = phase === "Catch-up week" ? (w.done ? w.done + " done · bonus week" : "Bonus week")
-      : rel > 0 ? phase
+    const meta = rel > 0 ? phase
       : w.total ? w.done + " of " + w.total + " done" : "";
     const t = $("weekTitle"), changed = t.textContent !== title;
     t.textContent = title;
