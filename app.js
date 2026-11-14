@@ -395,13 +395,19 @@
     return d.getDate() + " " + MONTHS[d.getMonth()] + (withYear ? " " + d.getFullYear() : "");
   }
   // ---------- shared UI components ----------
-  // Meta pills: "≈ 1,750 m · 25 m pool" → one tinted pill per fact. Used for every
-  // secondary detail line on the site so nothing is left as faint grey text.
-  function pills(text, acc, extra) {
-    const parts = (Array.isArray(text) ? text : String(text || "").split(/\s+·\s+|,\s+/)).filter(Boolean);
-    const all = parts.map(p => '<span class="pill">' + esc(p) + '</span>').concat(extra || []);
-    if (!all.length) return "";
-    return '<span class="pills"' + (acc ? ' style="--acc:' + acc + '"' : '') + '>' + all.join("") + '</span>';
+  // Fact line: "3 h · Z2 + 3 × 10′ upper Z3–low Z4" → one plain line of text under a
+  // title, the same on every screen. The amount (time or distance) leads in ink; the
+  // rest follows in secondary ink, with " · " between facts. No boxes, no tints.
+  const AMOUNT = /^[≈≤]?\s*\d[\d,.½–]*\s?(?:h(?:\s\d+)?|min|km|m)(?![\w′])/;
+  // keep "3 × 10′" and "70 min" from breaking across lines
+  const glue = t => esc(t).replace(/ × /g, "\u00A0×\u00A0").replace(/(\d) (h|min|km|m|s)(?![\w′])/g, "$1\u00A0$2").replace(/(\d\u00A0h) (\d)/g, "$1\u00A0$2").replace(/([≈≤]) /g, "$1\u00A0").replace(/\b(upper|mid|low|easy) (Z\d)/g, "$1\u00A0$2");
+  function facts(text, cls) {
+    // a list of short facts (block dates, week count) only ever breaks between facts
+    const parts = (Array.isArray(text) ? text.filter(Boolean).map(t => String(t).length < 24 ? String(t).replace(/ /g, "\u00A0") : String(t)) : String(text || "").split(/\s+·\s+/)).filter(Boolean);
+    if (!parts.length) return "";
+    const lead = AMOUNT.exec(parts[0]);
+    if (lead) parts[0] = "<b>" + glue(lead[0]) + "</b>" + glue(parts[0].slice(lead[0].length));
+    return '<span class="facts' + (cls ? " " + cls : "") + '">' + parts.map((p, i) => i || !lead ? glue(p) : p).join(" · ") + '</span>';
   }
   // Workout steps: section label (Warm-up, Main…) over readable body text.
   function steps(blocks, acc) {
@@ -978,7 +984,7 @@
     if (!sessions.length) {
       wrap.innerHTML = '<article class="tcard card t-rest" style="--acc:var(--c-rest)"><div class="tc-top"><div class="tc-badge">🌙</div>' +
         '<div class="tc-meta"><div class="tc-type">Off plan</div><h3>Nothing scheduled</h3>' +
-        pills([PLAN_SPAN], col("rest")) + '</div></div></article>';
+        facts([PLAN_SPAN]) + '</div></div></article>';
       return;
     }
 
@@ -991,7 +997,7 @@
       return '<article class="tcard card' + (done ? " done" : "") + (isRest ? " t-rest" : "") + '" style="--acc:' + col(s.type) + '">' +
         '<div class="tc-top">' +
           '<div class="tc-badge">' + (ICONS[s.type] || "•") + '</div>' +
-          '<div class="tc-meta"><div class="tc-type">' + meta(s.type).label + (s.optional && !/optional/i.test(s.title) ? " · optional" : "") + '</div><h3>' + esc(s.title) + '</h3>' + pills(s.sub, col(s.type)) + '</div>' +
+          '<div class="tc-meta"><div class="tc-type">' + meta(s.type).label + (s.optional && !/optional/i.test(s.title) ? " · optional" : "") + '</div><h3>' + esc(s.title) + '</h3>' + facts(s.sub) + '</div>' +
         '</div>' +
         prof + (main && !strip ? '<p class="tc-main">' + esc(cssify(main)) + '</p>' : '') +
         strip +
@@ -1886,9 +1892,8 @@
         html += '<button class="row" data-iso="' + d + '">' +
           '<span class="row-icon" style="background:color-mix(in srgb,' + col(s.type) + ' 16%, transparent)">' + (ICONS[s.type] || "•") + '</span>' +
           '<span class="row-main"><span class="row-title">' + esc(shortTitle(s.title)) + '</span>' +
-          pills(s.sub, col(s.type), real.slice(1).map(x =>
-            '<span class="pill" style="--acc:' + col(x.type) + '">+ ' + (ICONS[x.type] || "") + " " + esc(shortTitle(x.title)) + '</span>')) + '</span>' +
-          '<span class="row-end"><b>' + relDay(d) + '</b><span class="date-pill">' + dt.getDate() + ' ' + MON_ABBR[dt.getMonth()] + '</span></span>' + CHEV_SVG +
+          facts(s.sub) + real.slice(1).map(x => facts(["+ " + shortTitle(x.title)], "also")).join("") + '</span>' +
+          '<span class="row-end"><b>' + relDay(d) + '</b><span class="row-date">' + dt.getDate() + ' ' + MON_ABBR[dt.getMonth()] + '</span></span>' + CHEV_SVG +
         '</button>';
         found++;
       }
@@ -1986,7 +1991,7 @@
       return '<div class="' + cls + '" data-iso="' + iso + '">' +
         '<span class="row-icon" style="background:color-mix(in srgb,' + col(s.type) + ' 16%, transparent)">' + (ICONS[s.type] || "•") + '</span>' +
         '<span class="row-main"><span class="row-title">' + esc(shortTitle(s.title)) + '</span>' +
-        pills(s.sub, col(s.type)) + rowActual(iso, idx) + '</span>' +
+        facts(s.sub) + rowActual(iso, idx) + '</span>' +
         (isRest ? CHEV_SVG : '<button class="check-hit" data-iso="' + iso + '" data-idx="' + idx + '" aria-label="Mark ' + esc(shortTitle(s.title)) + ' done"><span class="check' + (dn ? " on" : "") + '">' + CHECK_SVG + '</span></button>') +
       '</div>';
     }).join("");
@@ -2019,7 +2024,7 @@
     const head = '<div class="peek-head"><h3>' + relDay(selIso).replace(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun)$/, DOW_FULL[TP.weekdayMon0(selIso)]) + ', ' + prettyDate(selIso) + '</h3>' +
       '<span>' + (day.sessions.length ? esc(day.phase.label + weekTxt(day, true)) : "") + '</span></div>';
     if (!day.sessions.length) {
-      el.innerHTML = head + '<div class="card list"><div class="row"><span class="row-main"><span class="row-title">Nothing planned</span>' + pills([PLAN_SPAN]) + '</span></div>' + extraRows(selIso, "row") + '</div>';
+      el.innerHTML = head + '<div class="card list"><div class="row"><span class="row-main"><span class="row-title">Nothing planned</span>' + facts([PLAN_SPAN]) + '</span></div>' + extraRows(selIso, "row") + '</div>';
       return;
     }
     const xs = extrasOn(selIso);
@@ -2070,10 +2075,10 @@
       const s = TP.parse(b.start), e = TP.parse(b.end);
       const span = s.getDate() + " " + MON_ABBR[s.getMonth()] + " → " + e.getDate() + " " + MON_ABBR[e.getMonth()] + " " + e.getFullYear();
       const st = b.id === cur ? "now" : (b.end < today ? "past" : "");
-      return '<div class="block card ' + st + '"><div class="block-top"><span class="block-n">Block ' + b.n + '</span>' +
+      return '<div class="block card ' + st + '"><div class="block-top"><span class="block-n">Block ' + b.n + ' · ' + esc(b.points) + '</span>' +
         (st === "now" ? '<span class="block-now">You are here</span>' : st === "past" ? '<span class="block-done">Done ✓</span>' : '') +
         '<h3>' + esc(b.name) + '</h3></div>' +
-        pills([span, weeks + " weeks", b.points], st === "now" ? "var(--accent)" : st === "past" ? "var(--good)" : null) +
+        facts([span, weeks + " weeks"]) +
         '<div class="block-focus">' + esc(b.focus) + '</div>' +
         '<div class="block-key">' + b.key.map(k => '<span>' + esc(k) + '</span>').join('') + '</div></div>';
     }).join("");
@@ -2165,7 +2170,7 @@
         '<div class="sess-top">' +
           '<div class="sess-badge" style="background:color-mix(in srgb,' + col(s.type) + ' 16%, transparent)">' + (ICONS[s.type] || "•") + '</div>' +
           '<div class="sess-main"><div class="stype" style="color:' + col(s.type) + '">' + meta(s.type).label + '</div><h4>' + esc(s.title) + '</h4>' +
-          pills(s.sub, col(s.type)) + '</div>' +
+          facts(s.sub) + '</div>' +
           (!isRest ? '<button class="check-hit d-chk" data-idx="' + idx + '" aria-label="Mark done"><span class="check' + (done ? " on" : "") + '">' + CHECK_SVG + '</span></button>' : '') +
         '</div>' + (plan ? '<div style="--acc:' + col(s.type) + '">' + profile(plan) + '</div>' : '') + stripFor(isoStr, idx);
       if (hasDetail) {
