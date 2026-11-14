@@ -449,16 +449,13 @@ svg{display:block;}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none;}
 
 /* ---------- shared components ---------- */
-/* meta pills: every secondary fact (distance, zone, duration, dates) is a pill
-   tinted by its discipline (--acc) — never loose grey text */
-.pills{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px;}
-.pill,.date-pill{
-  display:inline-flex;align-items:center;gap:4px;min-height:24px;padding:3px 10px;border-radius:999px;
-  font-size:12.5px;font-weight:600;line-height:1.2;letter-spacing:0;white-space:nowrap;
-  background:color-mix(in srgb, var(--acc, var(--ink)) 12%, transparent);
-  color:color-mix(in srgb, var(--acc, var(--ink)) 78%, var(--ink));
-}
-.date-pill{--acc:var(--ink);margin-top:4px;font-variant-numeric:tabular-nums;}
+/* fact line: the secondary facts under a title (duration, zone, distance, dates)
+   as one plain line of text — amount in ink, the rest in secondary ink */
+.facts{display:block;margin-top:3px;font-size:14px;line-height:1.38;font-weight:450;color:var(--ink-2);}
+.facts b{font-weight:650;color:var(--ink);}
+.facts.also{margin-top:1px;color:var(--ink-3);}
+.tcard .facts,.sess .facts,.block .facts{margin-top:5px;font-size:15px;}
+.done .facts b{color:var(--ink-2);}
 
 /* workout steps: section label over readable body text */
 .steps{display:grid;gap:0;margin-top:14px;}
@@ -520,7 +517,6 @@ svg{display:block;}
 .chev{width:8px;height:14px;flex:none;color:var(--ink-3);}
 .chev path{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
 .row.is-today .row-end b{color:var(--accent);}
-.row .pills{margin-top:5px;}
 .row{align-items:center;padding-top:13px;padding-bottom:13px;}
 
 /* ============================================================
@@ -1035,7 +1031,6 @@ textarea::placeholder{color:var(--ink-3);}
 .block-now{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--accent);color:#fff;margin-left:auto;}
 .block-done{font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--good-soft);color:var(--good);margin-left:auto;}
 .block h3{font-size:20px;width:100%;margin-top:2px;}
-.block .pills{margin-top:8px;}
 .block-focus{font-size:15px;line-height:1.45;margin-top:10px;}
 .block-key{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;}
 .block-key span{font-size:12.5px;font-weight:600;padding:5px 10px;border-radius:999px;background:var(--fill-2);color:var(--ink);}
@@ -1197,7 +1192,7 @@ textarea::placeholder{color:var(--ink-3);}
 .tag{display:inline-block;max-width:100%;margin-top:6px;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600;
   background:var(--fill-2);color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:top;}
 .tag.ok{background:var(--good-soft);color:var(--good);}
-.row-date{font-size:12.5px;color:var(--ink-3);margin-top:2px;}
+.row-date{font-size:12.5px;color:var(--ink-3);margin-top:2px;font-variant-numeric:tabular-nums;}
 .row-act{display:block;margin-top:5px;font-size:13px;font-weight:600;color:var(--good);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .list-cap{font-size:13px;font-weight:600;color:var(--ink-3);text-transform:uppercase;letter-spacing:.05em;padding:12px 16px 2px;}
 .extras{margin-top:12px;}
