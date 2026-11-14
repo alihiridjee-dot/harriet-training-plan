@@ -24,8 +24,9 @@ she moves (each returns joint angles for a moment in time), `rigScene()` is the 
 sky colours are under `.scene[data-scene=…]` in `styles.css`.
 
 **The surprise (November 2026).** The Today tab carries a jigsaw of wrapping paper over a hidden picture.
-Each new day Harriet opens the site she can tap to crack one piece; on Friday 20 Nov one tap shatters the
-rest and reveals her On Cloudboom shoes. Progress is kept on the device, so opening the site on another
+Each new day Harriet opens the site she can tap to crack one piece. She guessed it early, so on Saturday
+14 Nov the puzzle drops to its last piece and one tap reveals her On Cloudboom shoes (they arrive Friday
+20 Nov). The unwrapped card ends with a P.S. teasing another surprise in December or January (`GIFT.next`). Progress is kept on the device, so opening the site on another
 phone never cracks her pieces. Settings are in `GIFT` in `app.js`. To see the reveal without spoiling or
 saving anything, open the site with `?gift=preview`; `?gift=reset` wraps it back up on that device.
 

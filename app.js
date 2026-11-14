@@ -2412,23 +2412,28 @@
   // ============================================================
   // THE SURPRISE — a jigsaw that hides a gift, one piece a day
   // ============================================================
-  // Harriet's new shoes arrive on GIFT.reveal. Until then a jigsaw of wrapping
-  // paper covers a picture of them, and the picture underneath is frosted, so a
-  // cracked piece shows colour but gives nothing away. Each new day she opens
-  // the site she can tap to crack one more piece; on the day itself one tap
-  // shatters whatever is left and the picture comes into focus.
+  // Harriet's new shoes arrive on GIFT.arrive. A jigsaw of wrapping paper covers
+  // a picture of them, and the picture underneath is frosted, so a cracked piece
+  // shows colour but gives nothing away. Each new day she opens the site she can
+  // tap to crack one more piece. She guessed it early, so the reveal moved up to
+  // GIFT.reveal: that day the puzzle is down to its last piece whatever she'd
+  // cracked, and one tap on it brings the picture into focus. The unwrapped
+  // card then teases the next surprise (GIFT.next).
   // Progress lives on the device (not in the cloud copy), so Ali looking at the
   // site on his phone never cracks her pieces for her.
   //   ?gift=preview — play the reveal without saving anything
   //   ?gift=reset   — wrap it back up on this device
   const GIFT = {
-    reveal: "2026-11-20",          // Friday — the shoes arrive
+    reveal: "2026-11-14",          // she guessed it — the last piece is hers today
+    arrive: "2026-11-20",          // Friday — the shoes themselves arrive
     until: "2026-11-30",           // the unwrapped card stays up until then
     cols: 4, rows: 3,
     order: [0, 11, 3, 8, 1, 10, 7, 4, 2, 9, 6, 5],   // corners first, the middle last
     name: "On Cloudboom",
     clues: ["Something’s on its way to you…", "It comes as a pair.", "It’s lighter than you’d think.",
-      "It was made to go fast.", "It can’t wait for race day.", "It’s very nearly here."]
+      "It was made to go fast.", "It can’t wait for race day.", "It’s very nearly here."],
+    // on the unwrapped card: there's another one coming
+    next: "P.S. This isn’t the last one. Another surprise is already wrapped — keep checking in over December and January… 👀"
   };
   const GIFT_KEY = "htp_gift", JW = 400, JH = 300, PW = JW / GIFT.cols, PH = JH / GIFT.rows;
   const giftPreview = /[?&]gift=preview/.test(location.search);
@@ -2443,7 +2448,9 @@
   function giftSave() { if (giftPreview) return; try { localStorage.setItem(GIFT_KEY, JSON.stringify(giftMem)); } catch (e) { /* private mode */ } }
   function giftInfo() {
     const g = giftLoad(), t = giftPreview ? GIFT.reveal : today, total = GIFT.cols * GIFT.rows;
-    const revealDay = t >= GIFT.reveal, cracked = Math.min(g.days.length, total - 3);   // always a few left for the finale
+    const revealDay = t >= GIFT.reveal;
+    // before the day there are always a few left for the finale; on the day, just the last piece
+    const cracked = revealDay ? total - 1 : Math.min(g.days.length, total - 3);
     return {
       g: g, t: t, total: total, cracked: cracked, revealDay: revealDay, sleeps: TP.daysBetween(t, GIFT.reveal),
       canCrack: !revealDay && g.days.indexOf(t) < 0 && cracked < total - 3,
@@ -2546,10 +2553,12 @@
   function giftCopy(info) {
     if (info.g.opened) return {
       kicker: "🎁 Your surprise · from Ali", when: "Unwrapped", title: GIFT.name,
-      sub: "Your new race shoes" + (info.t === GIFT.reveal ? " arrive today" : "") + ". Light as a cloud, made to fly — just like you.", sign: "— Ali, your biggest fan"
+      sub: "Your new race shoes" + (info.t < GIFT.arrive ? ", landing on Friday" : info.t === GIFT.arrive ? " arrive today" : "") +
+        ". Light as a cloud, made to fly — just like you.", sign: "— Ali, your biggest fan", next: GIFT.next
     };
     const when = info.revealDay ? "Today!" : info.sleeps === 1 ? "1 sleep to go" : info.sleeps + " sleeps to go";
-    if (info.canOpen) return { kicker: "🎁 A surprise from Ali", when: when, title: "It’s here!", sub: "Tap to open your surprise." };
+    if (info.canOpen) return { kicker: "🎁 A surprise from Ali", when: when, title: "You guessed it…",
+      sub: "…so you’ve earned the last piece. Tap it to see if you’re right." };
     if (info.canCrack) return { kicker: "🎁 A surprise from Ali", when: when, title: "Today’s piece is ready",
       sub: "Tap the glowing piece to crack it open." + (info.cracked ? "" : " A new piece every day you check in — all is revealed on Friday.") };
     return { kicker: "🎁 A surprise from Ali", when: when, title: info.cracked + " of " + info.total + " pieces cracked",
@@ -2568,7 +2577,8 @@
       '<div class="gf-head"><span class="gf-kicker">' + esc(c.kicker) + '</span><span class="gf-when">' + esc(c.when) + '</span></div>' +
       '<button class="jz" id="jz"' + (live ? "" : " disabled") + ' aria-label="' + esc(info.g.opened ? GIFT.name + " running shoes" : c.title + " " + c.sub) + '">' + giftSvg(info) + '</button>' +
       '<div class="gf-foot"><div class="gf-txt"><div class="gf-title">' + esc(c.title) + '</div><p class="gf-sub">' + esc(c.sub) + '</p>' +
-        (c.clue ? '<span class="gf-clue">' + esc(c.clue) + '</span>' : '') + (c.sign ? '<div class="gf-sign">' + esc(c.sign) + '</div>' : '') + '</div>' +
+        (c.clue ? '<span class="gf-clue">' + esc(c.clue) + '</span>' : '') + (c.sign ? '<div class="gf-sign">' + esc(c.sign) + '</div>' : '') +
+        (c.next ? '<div class="gf-next">' + esc(c.next) + '</div>' : '') + '</div>' +
         (info.g.opened ? '' : '<div class="gf-dots" aria-label="' + info.cracked + ' of ' + info.total + ' pieces cracked">' + dots + '</div>') + '</div>';
     $("jz").addEventListener("click", () => {
       if (giftBusy) return;
@@ -2652,8 +2662,11 @@
     giftBusy = true;
     const el = $("gift"), svg = $("jz").querySelector("svg"), left = GIFT.order.slice(info.cracked);
     $("jz").disabled = true;
-    left.forEach((i, k) => setTimeout(() => crackPiece(svg, i, true), k * 95));
-    await new Promise(r => setTimeout(r, left.length * 95 + 260));
+    if (left.length === 1) await crackPiece(svg, left[0], false);   // the last piece gets the full crack
+    else {
+      left.forEach((i, k) => setTimeout(() => crackPiece(svg, i, true), k * 95));
+      await new Promise(r => setTimeout(r, left.length * 95 + 260));
+    }
     info.g.opened = true; giftSave();
     const c = giftCopy(giftInfo());
     el.classList.add("revealed", "revealing");
@@ -2664,6 +2677,7 @@
     const clue = el.querySelector(".gf-clue"); if (clue) clue.remove();
     const dots = el.querySelector(".gf-dots"); if (dots) dots.remove();
     const sign = document.createElement("div"); sign.className = "gf-sign"; sign.textContent = c.sign; el.querySelector(".gf-txt").appendChild(sign);
+    const next = document.createElement("div"); next.className = "gf-next"; next.textContent = c.next; el.querySelector(".gf-txt").appendChild(next);
     $("jz").setAttribute("aria-label", GIFT.name + " running shoes");
     const box = $("jz").getBoundingClientRect();
     confetti(160, { x: box.left + box.width / 2, y: box.top + box.height * 0.6 });
